@@ -102,7 +102,6 @@ const postSchedule = (reminders, scheduleChannelId) => {
   });
 
   // create the schedule string
-  // todo: add support for timezones other than pacific, if possible
   const schedule = dayIndeces.reduce((message, day) => {
     const reminder = thisWeekReminders.find(reminder => reminder.day === day) || {};
     const upperDay = `${day.slice(0, 1).toUpperCase()}${day.slice(1)}`;
@@ -118,22 +117,10 @@ const postSchedule = (reminders, scheduleChannelId) => {
       if ((episodesWatchedNum + episodeCount) === Number(episodes)) {
         isFinale = true;
       }
-      const [hourStr, minute = 0] = time.split(":");
-      const hour = Number(hourStr);
-      let formattedTime = "";
-      if (hour > 12) {
-        formattedTime = `${hour - 12}`;
-        if (minute) {
-          formattedTime = `${formattedTime}:${minute}`;
-        }
-        formattedTime = `${formattedTime} PM pacific`;
-      } else {
-        formattedTime = `${hour}`;
-        if (minute) {
-          formattedTime = `${formattedTime}:${minute}`;
-        }
-        formattedTime = `${formattedTime} AM pacific`;
-      }
+      const [hour, minute = 0] = time.split(":");
+      const eventDate = new Date();
+      eventDate.setHours(hour, minute);
+      const formattedTime = `<t:${Math.round(eventDate.getTime()/1000)}:t>`;
       daySchedule = `${upperDay}: ${name} ${episodesWatched + 1}-${episodesWatched + episodeCount}${isFinale ? " (finale!)" : ""} @ ${formattedTime}`;
     }
     if (message) {
@@ -375,8 +362,30 @@ client.on('messageCreate', async msg => {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders } = schedule;
     const list = reminders.reduce((prev, curr) => {
-      const { name, cadence, day, time, emoji } = curr;
-      const message = `${name}${Number(cadence) !== 1 ? ` every ${cadence} weeks` : ""} on ${day.slice(0, 1).toUpperCase()}${day.slice(1)} at ${time} pacific ${emoji}`
+      const { name, cadence, day, time, emoji, lastWatchDate, dayIndex } = curr;
+      const now = new Date();
+      let nowDayIndex = now.getDay() - 1; // convert to monday week start
+      if (nowDayIndex < 0) {
+        nowDayIndex = 6; // reset sunday to last day of the week
+      }
+      const eventDate = new Date();
+      const millisecondsInOneDay = 24 * 60 * 60 * 1000;
+      const millisecondsInOneWeek = 7 * millisecondsInOneDay;
+      const dayDateIndex = dayIndex === 6 ? 0 : dayIndex + 1;
+      let daysToAdd = (dayDateIndex + 7 - eventDate.getDay()) % 7;
+      const todayMilliseconds = now.getTime();
+      const nextWeekMilliseconds = todayMilliseconds + millisecondsInOneWeek;
+      const lastWatchTime = new Date(lastWatchDate).getTime();
+      const nextWatchTime = lastWatchTime + (Number(cadence) * millisecondsInOneWeek);
+      // todo: make this smarter so it can account for cadences longer than 2
+      if (nextWatchTime > nextWeekMilliseconds) {
+        daysToAdd += 7;
+      }
+      const [hour, minute = 0] = time.split(":");
+      eventDate.setHours(hour, minute);
+      eventDate.setTime(eventDate.getTime() + (daysToAdd * millisecondsInOneDay));
+      const formattedTime = `<t:${Math.round((eventDate.getTime())/1000)}:t>`;
+      const message = `${emoji} ${name}${Number(cadence) !== 1 ? ` every ${cadence} weeks` : ""} on ${day.slice(0, 1).toUpperCase()}${day.slice(1)} at ${formattedTime}`;
       if (prev) {
       return `${prev}\n${message}`;
       }
