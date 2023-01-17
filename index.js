@@ -1,6 +1,6 @@
 require('dotenv').config();
-const { FILE_PATH } = process.env;
-const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
+const { FILE_PATH, TOKEN } = process.env;
+const { Client, GatewayIntentBits } = require('discord.js');
 const fs = require("fs");
 const client = new Client({
   allowedMentions: { parse: ['users', 'roles'] },
@@ -294,6 +294,7 @@ const deleteReminder = (reminderKey) => {
 // !reminder rollback (after a show has been reminded for, decrement episodes for that event to what they were before the event)
 // !reminder increment (add an episode to the episodesWatched count)
 // !reminder decrement (remove an episode from the episodesWatched count)
+// !reminder help (list all commands)
 client.on('messageCreate', async msg => {
   const { channelId, content, author } = msg;
   const filter = m => author.id === m.author.id;
@@ -492,7 +493,9 @@ client.on('messageCreate', async msg => {
       reminder.episodesWatched = Number(episodesWatched) - 1;
       fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
     }
+  } else if (content === "!reminder help") {
+    currentChannel.send("Commands:\n!reminder set (create a reminder)\n!reminder delete (delete one or more reminders)\n!reminder list (list all existing reminders)\n!reminder setup (set information other than reminders)\n!reminder snooze (cancel timers for the day before they're sent)\n!reminder rollback (tell the bot you didn't watch the show after the reminders have already sent)\n!reminder increment (add an episode to the episodes watched count)\n!reminder decrement (remove an episode from the episodes watched count)");
   }
 });
 
-client.login(process.env.TOKEN);
+client.login(TOKEN);
