@@ -109,11 +109,10 @@ const postSchedule = (reminders, scheduleChannelId) => {
       const { name, episodes, episodesWatched = 0, nextWatchDate } = reminder;
       let isFinale = false;
       let episodeCount = 2;
-      const episodesWatchedNum = episodesWatched;
-      if (episodes - episodesWatchedNum === 3) {
+      if (episodes - episodesWatched === 3) {
         episodeCount = 3;
       }
-      if ((episodesWatchedNum + episodeCount) === episodes) {
+      if ((episodesWatched + episodeCount) === episodes) {
         isFinale = true;
       }
       const formattedTime = `<t:${Math.round(nextWatchDate.getTime()/1000)}:t>`;
