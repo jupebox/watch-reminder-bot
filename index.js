@@ -10,14 +10,18 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
   ]
 });
-
-// we start our weeks on monday, not sunday, for scheduling purposes to group the weekend as a unit
-const dayIndeces = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-
-// iirc this is the date format that all browsers can agree is a valid date. don't quote me on that
-const formatDate = date => {
-  return `${date.getMonth() + 1}-${date.getDate()}-${date.getFullYear()}`;
-}
+const {
+  millisecondsInTenMinutes,
+  millisecondsInOneHour,
+  millisecondsInTwoHours,
+  millisecondsInOneDay,
+  millisecondsInOneWeek,
+  dayIndeces,
+  formatDate,
+  nextWatchDate,
+  nextWatchDate,
+  todayDayIndex,
+} = require("./helpers.js");
 
 let reminderCount = 0; // prevent duplicate reminders from being set on the same day
 let earlyReminder; // 2 hour reminder
@@ -29,16 +33,10 @@ const remindToWatch = (reminder) => {
     channel: channelCode,
     emoji,
     role,
-    time,
     name,
   } = reminder;
-  const [hour, minute = 0] = time.split(":");
-  const now = new Date();
-  const eventTime = new Date();
-  eventTime.setHours(hour, minute);
-  const millisecondsUntilEvent = eventTime.getTime() - now.getTime();
-  const millisecondsInTwoHours = 2 * 60 * 60 * 1000;
-  const millisecondsInTenMinutes = 10 * 60 * 1000;
+  const nextWatchDate = nextWatchDate(reminder);
+  const millisecondsUntilEvent = nextWatchDate.getTime() - now.getTime();
   const channelId = channelCode.slice(2).slice(0, -1);
   if (millisecondsUntilEvent < 0) {
     return;
@@ -57,7 +55,7 @@ const remindToWatch = (reminder) => {
     }, (millisecondsUntilEvent - millisecondsInTwoHours));
   }
   if ((millisecondsUntilEvent - millisecondsInTenMinutes) < 0) {
-    // skip the 10 minute reminder and go straight to a "right away reminder"
+    // skip the 10 minute reminder and just remind immediately
     if (reminderCount === 1) {
         const channel = client.channels.cache.get(channelId);
         channel.send(`${role} time imminently! ${emoji}`);
@@ -78,14 +76,11 @@ const remindToWatch = (reminder) => {
 
 const postSchedule = (reminders, scheduleChannelId) => {
   const now = new Date();
-  const millisecondsInOneHour = 60 * 60 * 1000
-  const millisecondsInOneDay = 24 * millisecondsInOneHour;
-  const millisecondsInOneWeek = 7 * millisecondsInOneDay;
   // exclude reminders for shows that aren't happening this week
   // todo: support future start dates for upcoming weekly shows
-  const thisWeekReminders = reminders.filter(reminder => {
-    const { lastWatchDate, cadence, episodes, episodesWatched } = reminder;
-    if (Number(episodes) <= Number(episodesWatched)) {
+  const thisWeekReminders = reminders.map(reminder => reminder.nextWatchDate = nextWatchDate(reminder)).filter(reminder => {
+    const { cadence, episodes, episodesWatched, nextWatchDate } = reminder;
+    if (episodes <= episodesWatched) {
       // we're done with this show and it just needs to be cleaned up
       return;
     }
@@ -94,8 +89,7 @@ const postSchedule = (reminders, scheduleChannelId) => {
     }
     const todayMilliseconds = now.getTime();
     const nextWeekMilliseconds = todayMilliseconds + millisecondsInOneWeek;
-    const lastWatchTime = new Date(lastWatchDate).getTime();
-    const nextWatchTime = lastWatchTime + (Number(cadence) * millisecondsInOneWeek);
+    const nextWatchTime = nextWatchDate.getTime();
     if ((nextWatchTime > todayMilliseconds) && (nextWatchTime < nextWeekMilliseconds)) {
       return reminder;
     }
@@ -103,28 +97,25 @@ const postSchedule = (reminders, scheduleChannelId) => {
 
   // create the schedule string
   const schedule = dayIndeces.reduce((message, day) => {
-    const reminder = thisWeekReminders.find(reminder => reminder.day === day) || {};
+    const reminder = thisWeekReminders.find(reminder => reminder.day.toLowerCase() === day) || {};
     const upperDay = `${day.slice(0, 1).toUpperCase()}${day.slice(1)}`;
     let daySchedule = `${upperDay}: no stream`;
     if (reminder && reminder.name) {
-      const { name, time, episodes, episodesWatched = 0 } = reminder;
+      const { name, episodes, episodesWatched = 0, nextWatchDate } = reminder;
       let isFinale = false;
       let episodeCount = 2;
-      const episodesWatchedNum = Number(episodesWatched);
-      if (Number(episodes) - episodesWatchedNum === 3) {
+      const episodesWatchedNum = episodesWatched;
+      if (episodes - episodesWatchedNum === 3) {
         episodeCount = 3;
       }
-      if ((episodesWatchedNum + episodeCount) === Number(episodes)) {
+      if ((episodesWatchedNum + episodeCount) === episodes) {
         isFinale = true;
       }
-      const [hour, minute = 0] = time.split(":");
-      const eventDate = new Date();
-      eventDate.setHours(hour, minute);
-      const formattedTime = `<t:${Math.round(eventDate.getTime()/1000)}:t>`;
+      const formattedTime = `<t:${Math.round(nextWatchDate.getTime()/1000)}:t>`;
       daySchedule = `${upperDay}: ${name} ${episodesWatched + 1}-${episodesWatched + episodeCount}${isFinale ? " (finale!)" : ""} @ ${formattedTime}`;
     }
     if (message) {
-    return `${message}\n${daySchedule}`;
+      return `${message}\n${daySchedule}`;
     }
     return daySchedule;
   }, "");
@@ -144,32 +135,17 @@ const checkForReminders = () => {
   if (!reminders.length) {
     return;
   }
-  const now = new Date();
-  let nowDayIndex = now.getDay() - 1; // convert to monday week start
-  if (nowDayIndex < 0) {
-    nowDayIndex = 6; // reset sunday to last day of the week
-  }
+
+  const nowDayIndex = todayDayIndex();
 
   if (nowDayIndex === 5 && scheduleChannelId) {
     postSchedule(reminders, scheduleChannelId);
   }
 
-  const todayReminders = reminders.filter(reminder => Number(reminder.dayIndex) === nowDayIndex);
+  const now = new Date();
   const todayDate = formatDate(now); // strip out time information
-  let reminder;
-  if (todayReminders.length > 1) {
-    reminder = todayReminders.find(reminder => {
-      const {lastWatchDate, cadence} = reminder;
-      const lastWatchTime = new Date(lastWatchDate);
-      const cadenceMilliseconds = cadence * 7 * 24 * 60 * 60 * 1000;
-      const todayTime = new Date(todayDate);
-      if (todayTime.getTime === (lastWatchTime.getTime() + cadenceMilliseconds)) {
-        return reminder;
-      }
-    });
-  } else if (todayReminders.length === 1) {
-    reminder = todayReminders[0];
-  }
+
+  const reminder = reminders.find(reminder => formatDate(nextWatchDate(reminder)) === todayDate);
   if (reminder) {
     if (Number(reminder.episodesWatched) !== Number(reminder.episodes)) {
       remindToWatch(reminder);
@@ -217,8 +193,6 @@ const createReminder = (name, channel, role, day, time, cadence = 1, episodes = 
   const dayIndex = dayIndeces.indexOf(day.toLowerCase());
   const dayDateIndex = dayIndex === 6 ? 0 : dayIndex + 1;
   const showDate = new Date();
-  const millisecondsInOneDay = 24 * 60 * 60 * 1000;
-  const millisecondsInOneWeek = 7 * millisecondsInOneDay;
   const currentDayIndex = showDate.getDay();
   if (dayDateIndex !== currentDayIndex) {
     // i found this online but it added days using setDate which caused some issues when crossing months, for me
@@ -242,15 +216,16 @@ const createReminder = (name, channel, role, day, time, cadence = 1, episodes = 
     day,
     dayIndex,
     emoji,
-    episodes,
+    episodes: Number(episodes),
+    episodesWatched: 0,
     lastWatchDate: formatDate(new Date(lastWatchDate)),
     name,
     role,
     time,
   });
   schedule.reminders = filteredReminders.sort((a, b) => {
-      return a.dayIndex < b.dayIndex ? -1 : 0;
-    });
+    return a.dayIndex < b.dayIndex ? -1 : 0;
+  });
   fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
 }
 
@@ -362,28 +337,8 @@ client.on('messageCreate', async msg => {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders } = schedule;
     const list = reminders.reduce((prev, curr) => {
-      const { name, cadence, day, time, emoji, lastWatchDate, dayIndex } = curr;
-      const now = new Date();
-      let nowDayIndex = now.getDay() - 1; // convert to monday week start
-      if (nowDayIndex < 0) {
-        nowDayIndex = 6; // reset sunday to last day of the week
-      }
-      const eventDate = new Date();
-      const millisecondsInOneDay = 24 * 60 * 60 * 1000;
-      const millisecondsInOneWeek = 7 * millisecondsInOneDay;
-      const dayDateIndex = dayIndex === 6 ? 0 : dayIndex + 1;
-      let daysToAdd = (dayDateIndex + 7 - eventDate.getDay()) % 7;
-      const todayMilliseconds = now.getTime();
-      const nextWeekMilliseconds = todayMilliseconds + millisecondsInOneWeek;
-      const lastWatchTime = new Date(lastWatchDate).getTime();
-      const nextWatchTime = lastWatchTime + (Number(cadence) * millisecondsInOneWeek);
-      // todo: make this smarter so it can account for cadences longer than 2
-      if (nextWatchTime > nextWeekMilliseconds) {
-        daysToAdd += 7;
-      }
-      const [hour, minute = 0] = time.split(":");
-      eventDate.setHours(hour, minute);
-      eventDate.setTime(eventDate.getTime() + (daysToAdd * millisecondsInOneDay));
+      const { name, cadence, day, emoji } = curr;
+      const eventDate = nextWatchDate(curr);
       const formattedTime = `<t:${Math.round((eventDate.getTime())/1000)}:t>`;
       const message = `${emoji} ${name}${Number(cadence) !== 1 ? ` every ${cadence} weeks` : ""} on ${day.slice(0, 1).toUpperCase()}${day.slice(1)} at ${formattedTime}`;
       if (prev) {
@@ -478,8 +433,8 @@ client.on('messageCreate', async msg => {
     });
     const { episodesWatched, name } = reminder;
     if (reminder && reminder.name) {
-      currentChannel.send(`Incremented episode count of ${name} from ${episodesWatched} to ${Number(episodesWatched) + 1}.`);
-      reminder.episodesWatched = Number(episodesWatched) + 1;
+      currentChannel.send(`Incremented episode count of ${name} from ${episodesWatched} to ${episodesWatched + 1}.`);
+      reminder.episodesWatched = episodesWatched + 1;
       fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
     }
   } else if (content === "!reminder decrement") {
@@ -492,8 +447,8 @@ client.on('messageCreate', async msg => {
     });
     const { episodesWatched, name } = reminder;
     if (reminder && reminder.name) {
-      currentChannel.send(`Decremented episode count of ${name} from ${episodesWatched} to ${Number(episodesWatched) - 1}.`);
-      reminder.episodesWatched = Number(episodesWatched) - 1;
+      currentChannel.send(`Decremented episode count of ${name} from ${episodesWatched} to ${episodesWatched - 1}.`);
+      reminder.episodesWatched = episodesWatched - 1;
       fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
     }
   } else if (content === "!reminder help") {
