@@ -19,7 +19,6 @@ const {
   dayIndeces,
   formatDate,
   nextWatchDate,
-  nextWatchDate,
   todayDayIndex,
 } = require("./helpers.js");
 
@@ -35,8 +34,9 @@ const remindToWatch = (reminder) => {
     role,
     name,
   } = reminder;
-  const nextWatchDate = nextWatchDate(reminder);
-  const millisecondsUntilEvent = nextWatchDate.getTime() - now.getTime();
+  const now = new Date();
+  const eventDate = nextWatchDate(reminder);
+  const millisecondsUntilEvent = eventDate.getTime() - now.getTime();
   const channelId = channelCode.slice(2).slice(0, -1);
   if (millisecondsUntilEvent < 0) {
     return;
