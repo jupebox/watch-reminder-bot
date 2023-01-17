@@ -206,6 +206,7 @@ const checkForReminders = () => {
       deleteReminder(reminder.name);
     }
   }
+  // check at midnight for tomorrow's reminders
   const minutesUntilTheHour = 60 - now.getMinutes();
   const hoursUntilTomorrow = 23 - now.getHours();
   setTimeout(() => {
@@ -216,13 +217,6 @@ const checkForReminders = () => {
 client.on('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
   checkForReminders();
-  const now = new Date();
-  const minutesUntilTheHour = 60 - now.getMinutes();
-  const hoursUntilTomorrow = 23 - now.getHours();
-  // check at midnight for tomorrow's reminders
-  setTimeout(() => {
-    checkForReminders();
-  }, ((hoursUntilTomorrow * 60) + minutesUntilTheHour) * 60 * 1000);
 });
 
 // probably should put these parameters into an object. there's a lot of them.
