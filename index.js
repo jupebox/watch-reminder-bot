@@ -78,22 +78,27 @@ const postSchedule = (reminders, scheduleChannelId) => {
   const now = new Date();
   // exclude reminders for shows that aren't happening this week
   // todo: support future start dates for upcoming weekly shows
-  const thisWeekReminders = reminders.map(reminder => reminder.nextWatchDate = nextWatchDate(reminder)).filter(reminder => {
-    const { cadence, episodes, episodesWatched, nextWatchDate } = reminder;
-    if (episodes <= episodesWatched) {
-      // we're done with this show and it just needs to be cleaned up
-      return;
-    }
-    if (cadence === 1) {
+  const thisWeekReminders = reminders
+    .map((reminder) => {
+      reminder.nextWatchDate = nextWatchDate(reminder);
       return reminder;
-    }
-    const todayMilliseconds = now.getTime();
-    const nextWeekMilliseconds = todayMilliseconds + millisecondsInOneWeek;
-    const nextWatchTime = nextWatchDate.getTime();
-    if ((nextWatchTime > todayMilliseconds) && (nextWatchTime < nextWeekMilliseconds)) {
-      return reminder;
-    }
-  });
+    })
+    .filter(reminder => {
+      const { cadence, episodes, episodesWatched, nextWatchDate } = reminder;
+      if (episodes <= episodesWatched) {
+        // we're done with this show and it just needs to be cleaned up
+        return;
+      }
+      if (cadence === 1) {
+        return reminder;
+      }
+      const todayMilliseconds = now.getTime();
+      const nextWeekMilliseconds = todayMilliseconds + millisecondsInOneWeek;
+      const nextWatchTime = new Date(nextWatchDate).getTime();
+      if ((nextWatchTime > todayMilliseconds) && (nextWatchTime < nextWeekMilliseconds)) {
+        return reminder;
+      }
+    });
 
   // create the schedule string
   const schedule = dayIndeces.reduce((message, day) => {
