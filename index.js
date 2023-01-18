@@ -99,6 +99,10 @@ const postSchedule = (reminders, scheduleChannelId) => {
         return reminder;
       }
     });
+  
+  if (!thisWeekReminders.length) {
+    return;
+  }
 
   // create the schedule string
   const schedule = dayIndeces.reduce((message, day) => {
@@ -124,11 +128,17 @@ const postSchedule = (reminders, scheduleChannelId) => {
     return daySchedule;
   }, "");
 
+  // hardcoded for now
+  const weekStartDate = new Date();
+  weekStartDate.setTime(weekStartDate.getTime() + (millisecondsInOneDay * 2));
+  const weekStart = `${`0${(weekStartDate.getMonth() + 1)}`.slice(-2)}/${`0${weekStartDate.getDate()}`.slice(-2)}`;
+  weekStartDate.setTime(weekStartDate.getTime() + (millisecondsInOneDay * 6));
+  const weekEnd = `${`0${(weekStartDate.getMonth() + 1)}`.slice(-2)}/${`0${weekStartDate.getMonth()}`.slice(-2)}`;
   // this function gets called at midnight on Saturday,
   // so this delays the schedule for 8 hours so it doesn't get posted in the middle of the night
   setTimeout(() => {
     const channel = client.channels.cache.get(scheduleChannelId);
-    channel.send(schedule);
+    channel.send(`Anime schedule ${weekStart} - ${weekEnd}:\n${schedule}`);
   }, (millisecondsInOneHour * 8));
 }
 
