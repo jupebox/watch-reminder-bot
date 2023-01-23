@@ -25,7 +25,8 @@ const {
 let reminderCount = 0; // prevent duplicate reminders from being set on the same day
 let earlyReminder; // 2 hour reminder
 let lateReminder; // 10 minute reminder
-let episodesWatchedToday = 0; // for rollback
+let cleanupTimer; // 2 hour timer after watch time to mark the show as watched
+let watchedShow = false;
 
 const remindToWatch = (reminder) => {
   const {
@@ -33,12 +34,18 @@ const remindToWatch = (reminder) => {
     emoji,
     role,
     name,
+    lastWatchDate,
   } = reminder;
   const now = new Date();
+  const todayDate = formatDate(now);
   const eventDate = nextWatchDate(reminder);
   const millisecondsUntilEvent = eventDate.getTime() - now.getTime();
   const channelId = channelCode.slice(2).slice(0, -1);
   if (millisecondsUntilEvent < 0) {
+    if (lastWatchDate !== todayDate && todayDate === formatDate(eventDate)) {
+      // the show hasn't been marked as watched yet, but it was supposed to be watched and reminded for today
+      watchShow();
+    }
     return;
   }
   console.log(`setting reminders for ${name}! ${Math.round(millisecondsUntilEvent / 1000 / 60 / 60)} hours until the event.`);
@@ -72,6 +79,12 @@ const remindToWatch = (reminder) => {
       }
     }, (millisecondsUntilEvent - millisecondsInTenMinutes));
   }
+  // mark the show as watched
+  cleanupTimer = setTimeout(() => {
+    if (!watchedShow) {
+        watchShow();
+    }
+  }, (millisecondsUntilEvent + millisecondsInTwoHours));
 }
 
 const postSchedule = (reminders, scheduleChannelId) => {
@@ -133,7 +146,7 @@ const postSchedule = (reminders, scheduleChannelId) => {
   weekStartDate.setTime(weekStartDate.getTime() + (millisecondsInOneDay * 2));
   const weekStart = `${`0${(weekStartDate.getMonth() + 1)}`.slice(-2)}/${`0${weekStartDate.getDate()}`.slice(-2)}`;
   weekStartDate.setTime(weekStartDate.getTime() + (millisecondsInOneDay * 6));
-  const weekEnd = `${`0${(weekStartDate.getMonth() + 1)}`.slice(-2)}/${`0${weekStartDate.getMonth()}`.slice(-2)}`;
+  const weekEnd = `${`0${(weekStartDate.getMonth() + 1)}`.slice(-2)}/${`0${weekStartDate.getDate()}`.slice(-2)}`;
   // this function gets called at midnight on Saturday,
   // so this delays the schedule for 8 hours so it doesn't get posted in the middle of the night
   setTimeout(() => {
@@ -144,6 +157,7 @@ const postSchedule = (reminders, scheduleChannelId) => {
 
 // recursive function called once a day at midnight to set the day's reminders
 const checkForReminders = () => {
+  watchedShow = false;
   const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
   const { reminders = [], scheduleChannelId } = schedule;
   if (!reminders.length) {
@@ -163,21 +177,6 @@ const checkForReminders = () => {
   if (reminder) {
     if (Number(reminder.episodesWatched) !== Number(reminder.episodes)) {
       remindToWatch(reminder);
-      // guard against bot dying and restarting and accidentally incrementing the episode count
-      // the reminders won't be set properly though, in that case
-      // todo: increment episodes and watch date AFTER the event time has passed
-      // todo: store "number of episodes watched last session" in schedule.json to prevent
-      // edge case where rollback or snooze will not work if bot died that day
-      if (reminder.lastWatchDate !== todayDate) {
-        reminder.episodesWatched = (Number(reminder.episodesWatched) || 0) + 2;
-        episodesWatchedToday = 2;
-        if ((Number(reminder.episodes) - reminder.episodesWatched) === 1) {
-          reminder.episodesWatched = reminder.episodes;
-          episodesWatchedToday = 3;
-        }
-        reminder.lastWatchDate = todayDate;
-        fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
-      }
     } else {
       // clean up shows with no episodes left to watch
       deleteReminder(reminder.name);
@@ -189,6 +188,25 @@ const checkForReminders = () => {
   setTimeout(() => {
     checkForReminders();
   }, ((hoursUntilTomorrow * 60) + minutesUntilTheHour) * 60 * 1000);
+}
+
+const watchShow = () => {
+  const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
+  const { reminders = [] } = schedule;
+  const reminder = reminders.find(reminder => formatDate(nextWatchDate(reminder)) === todayDate);
+  const { episodes, episodesWatched = 0, lastWatchDate } = reminder;
+  let episodeCount = 2;
+  if (episodes - episodesWatched === 3) {
+    episodeCount = 3;
+  }
+  const todayDate = formatDate(now); // strip out time information
+  if (lastWatchDate !== todayDate) {
+    reminder.episodesWatched = episodesWatched + episodeCount;
+    reminder.lastWatchDate = todayDate;
+    reminder.episodesWatchedLastSession = episodeCount;
+    fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
+  }
+  watchedShow = true;
 }
 
 client.on('ready', () => {
@@ -265,6 +283,7 @@ const deleteReminder = (reminderKey) => {
 // !reminder increment (add an episode to the episodesWatched count)
 // !reminder decrement (remove an episode from the episodesWatched count)
 // !reminder help (list all commands)
+// !neko stop (watched phrase by watch party; usually typed when the show is over for the day, so we can watch it to see if the show should be updated)
 client.on('messageCreate', async msg => {
   const { channelId, content, author } = msg;
   const filter = m => author.id === m.author.id;
@@ -396,8 +415,9 @@ client.on('messageCreate', async msg => {
         if (msg.slice(0, 1).toLowerCase() === "y") {
           clearTimeout(earlyReminder);
           clearTimeout(lateReminder);
+          clearTimeout(cleanupTimer);
           reminderCount = 0;
-          reminder.episodesWatched = reminder.episodesWatched - episodesWatchedToday;
+          reminder.lastWatchDate = formatDate(new Date());
           fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
           currentChannel.send("Ok, today's reminders canceled.");
         } else {
@@ -418,17 +438,18 @@ client.on('messageCreate', async msg => {
       const reminderChannelId = channel.slice(2).slice(0, -1);
       return (channelId === reminderChannelId);
     });
+    const { episodesWatchedLastSession } = reminder;
     if (reminder && reminder.name) {
       currentChannel.send(`Did you skip watching ${reminder.name} today?`);
       try {
         const messages = await currentChannel.awaitMessages({ filter, time: 10000, max: 1, errors: ['time'] });
         const msg = messages.first().content;
         if (msg.slice(0, 1).toLowerCase() === "y") {
-          reminder.episodesWatched = reminder.episodesWatched - episodesWatchedToday;
+          reminder.episodesWatched = reminder.episodesWatched - episodesWatchedLastSession;
           fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
           currentChannel.send("Ok, the episode count has been reset.");
         } else {
-          currentChannel.send(`Hope you enjoyed those ${episodesWatchedToday} episodes!`);
+          currentChannel.send(`Hope you enjoyed those ${episodesWatchedLastSession} episodes!`);
         }
         return;
       } catch (err) {
@@ -467,7 +488,44 @@ client.on('messageCreate', async msg => {
     }
   } else if (content === "!reminder help") {
     currentChannel.send("Commands:\n!reminder set (create a reminder)\n!reminder delete (delete one or more reminders)\n!reminder list (list all existing reminders)\n!reminder setup (set information other than reminders)\n!reminder snooze (cancel timers for the day before they're sent)\n!reminder rollback (tell the bot you didn't watch the show after the reminders have already sent)\n!reminder increment (add an episode to the episodes watched count)\n!reminder decrement (remove an episode from the episodes watched count)");
+  } else if (content === "!neko stop") {
+    const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
+    const { reminders = [] } = schedule;
+    const reminder = reminders.find(reminder => {
+      const { channel } = reminder;
+      const reminderChannelId = channel.slice(2).slice(0, -1);
+      return (channelId === reminderChannelId);
+    });
+    if (reminder && reminder.name) {
+      currentChannel.send(`Did you watch ${reminder.name} today?`);
+      try {
+        const messages = await currentChannel.awaitMessages({ filter, time: 10000, max: 1, errors: ['time'] });
+        const msg = messages.first().content;
+        if (msg.slice(0, 1).toLowerCase() === "y") {
+          clearTimeout(cleanupTimer);
+          watchShow();
+          currentChannel.send("Ok, episode count updated. Hope they were good ones!");
+        } else {
+          clearTimeout(cleanupTimer);
+          reminder.lastWatchDate = formatDate(new Date());
+          fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
+          currentChannel.send("Ok, episode count not updated.");
+        }
+        return;
+      } catch (err) {
+        console.log(err);
+        currentChannel.send("Request timed out.");
+        return;
+      }
+    }
+    
+
   }
+  // else if (content === "!reminder schedule") {
+  //   const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
+  //   const { reminders = [], scheduleChannelId } = schedule;
+  //   postSchedule(reminders, scheduleChannelId);
+  // }
 });
 
 client.login(TOKEN);
