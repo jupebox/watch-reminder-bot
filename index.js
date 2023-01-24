@@ -193,13 +193,14 @@ const checkForReminders = () => {
 const watchShow = () => {
   const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
   const { reminders = [] } = schedule;
+  const now = new Date();
+  const todayDate = formatDate(now); // strip out time information
   const reminder = reminders.find(reminder => formatDate(nextWatchDate(reminder)) === todayDate);
   const { episodes, episodesWatched = 0, lastWatchDate } = reminder;
   let episodeCount = 2;
   if (episodes - episodesWatched === 3) {
     episodeCount = 3;
   }
-  const todayDate = formatDate(now); // strip out time information
   if (lastWatchDate !== todayDate) {
     reminder.episodesWatched = episodesWatched + episodeCount;
     reminder.lastWatchDate = todayDate;
