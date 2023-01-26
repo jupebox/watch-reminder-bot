@@ -24,24 +24,23 @@ const todayDayIndex = () => {
 const nextWatchDate = (reminder) => {
     const { cadence, dayIndex, lastWatchDate, time } = reminder;
     const now = new Date();
+    const today = formatDate(now);
     const eventDate = new Date();
     const dayDateIndex = dayIndex === 6 ? 0 : dayIndex + 1;
     let daysToAdd = (dayDateIndex + 7 - eventDate.getDay()) % 7;
-    const todayMilliseconds = now.getTime();
+    const todayMilliseconds = new Date(today).getTime();
     const nextWeekMilliseconds = todayMilliseconds + millisecondsInOneWeek;
     const lastWatchTime = new Date(lastWatchDate).getTime();
-    const nextWatchTime = lastWatchTime + (Number(cadence) * millisecondsInOneWeek);
+    const nextWatchTime = lastWatchTime + Number(cadence) * millisecondsInOneWeek;
     // todo: make this smarter so it can account for cadences larger than 2
-    if (nextWatchTime > nextWeekMilliseconds) {
+    if (nextWatchTime >= nextWeekMilliseconds) {
         daysToAdd += 7;
     }
     const [hour, minute = 0] = time.split(":");
     eventDate.setHours(hour, minute);
-    eventDate.setTime(eventDate.getTime() + (daysToAdd * millisecondsInOneDay));
+    eventDate.setTime(eventDate.getTime() + daysToAdd * millisecondsInOneDay);
     return eventDate;
-}
-
-
+};
 
 exports.millisecondsInTenMinutes = millisecondsInTenMinutes;
 exports.millisecondsInOneHour = millisecondsInOneHour;
