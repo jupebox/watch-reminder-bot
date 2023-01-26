@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { FILE_PATH, TOKEN } = process.env;
+const { CALENDAR_EVENT, FILE_PATH, TOKEN } = process.env;
 const { Client, GatewayIntentBits } = require('discord.js');
 const fs = require("fs");
 const client = new Client({
@@ -21,6 +21,75 @@ const {
   nextWatchDate,
   todayDayIndex,
 } = require("./helpers.js");
+
+const calendarEventLines = fs.readFileSync(CALENDAR_EVENT, {encoding: "utf8"}).toString().split("\n");
+
+const generateCalendarEvent = (reminder) => {
+  const {
+    cadence,
+    channel: channelCode,
+    episodes,
+    episodesWatched = 0,
+    name,
+  } = reminder;
+  const channelId = channelCode.slice(2).slice(0, -1);
+  const now = new Date();
+  const eventDate = nextWatchDate(reminder);
+  const makeTwoDigits = (input) => {
+    return `0${input}`.slice(-2);
+  }
+  const makeTimestamp = (date) => {
+    return `${date.getFullYear()}${makeTwoDigits(date.getMonth() + 1)}${makeTwoDigits(date.getDate())}T${makeTwoDigits(date.getHours())}${makeTwoDigits(date.getMinutes())}${makeTwoDigits(date.getSeconds())}`;
+  }
+  const nowTimeStamp = makeTimestamp(now);
+  const watchesLeft = Math.floor((episodes - episodesWatched) / 2);
+  const startTimeStamp = makeTimestamp(eventDate);
+  eventDate.setTime(eventDate.getTime() + millisecondsInOneHour);
+  const endTimeStamp = makeTimestamp(eventDate);
+  
+  const newEvent = calendarEventLines.map(line => {
+    const [key, value] = line.split(":");
+    let newValue;
+    switch (key) {
+      case "CREATED":
+      case "LAST-MODIFIED":
+      case "DTSTAMP":
+        newValue = `${nowTimeStamp}Z`;
+        break;
+      case "UID":
+        newValue = `${now.getTime()}-discord-anime-scheduling-bot`;
+        break;
+      case "RRULE":
+        newValue = `FREQ=WEEKLY;INTERVAL=${cadence};COUNT=${watchesLeft}`;
+        break;
+      case "DTSTART;TZID=America/Los_Angeles":
+        newValue = startTimeStamp;
+        break;
+      case "DTEND;TZID=America/Los_Angeles":
+        newValue = endTimeStamp;
+        break;
+      case "SUMMARY":
+        newValue = name;
+        break;
+      default:
+        return `${key}:${value}`;
+    }
+    return `${key}:${newValue}`;
+  });
+  fs.writeFileSync(CALENDAR_EVENT, newEvent.join("\n"));
+  const channel = client.channels.cache.get(channelId);
+  try {
+    channel.send({
+      files: [{
+        attachment: CALENDAR_EVENT,
+        name: `${name.toLowerCase().replaceAll(" ", "-")}.ics`,
+        description: `Calendar event for ${name}`
+      }]
+    });
+  } catch (err) {
+    channel.send("Unable to send calendar event file.");
+  }
+}
 
 let reminderCount = 0; // prevent duplicate reminders from being set on the same day
 let earlyReminder; // 2 hour reminder
@@ -262,9 +331,6 @@ const createReminder = (name, channel, role, day, time, cadence = 1, episodes = 
   fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
 }
 
-// todo: pop up an error message if somebody tries to delete by a keyword that is present across multiple reminders (other than day)
-// actually i don't know if that's possible since channel and role are ids and it checks for the whole name, not partial name matches
-// false alarm this is fine
 const deleteReminder = (reminderKey) => {
   const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
   const { reminders = [] } = schedule;
@@ -273,7 +339,6 @@ const deleteReminder = (reminderKey) => {
   fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
 }
 
-// i'm so sorry
 // watched phrases:
 // !reminder set (create a reminder)
 // !reminder delete (delete one or more reminders)
@@ -283,6 +348,7 @@ const deleteReminder = (reminderKey) => {
 // !reminder rollback (after a show has been reminded for, decrement episodes for that event to what they were before the event)
 // !reminder increment (add an episode to the episodesWatched count)
 // !reminder decrement (remove an episode from the episodesWatched count)
+// !reminder calendar (generate an ics file with the event information)
 // !reminder help (list all commands)
 // !neko stop (watched phrase by watch party; usually typed when the show is over for the day, so we can watch it to see if the show should be updated)
 client.on('messageCreate', async msg => {
@@ -487,8 +553,21 @@ client.on('messageCreate', async msg => {
       reminder.episodesWatched = episodesWatched - 1;
       fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
     }
+  } else if (content === "!reminder calendar") {
+    const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
+    const { reminders = [] } = schedule;
+    const reminder = reminders.find(reminder => {
+      const { channel } = reminder;
+      const reminderChannelId = channel.slice(2).slice(0, -1);
+      return (channelId === reminderChannelId);
+    });
+    if (reminder && reminder.name) {
+      generateCalendarEvent(reminder);
+    } else {
+      currentChannel.send("No reminder found for this channel.");
+    }
   } else if (content === "!reminder help") {
-    currentChannel.send("Commands:\n!reminder set (create a reminder)\n!reminder delete (delete one or more reminders)\n!reminder list (list all existing reminders)\n!reminder setup (set information other than reminders)\n!reminder snooze (cancel timers for the day before they're sent)\n!reminder rollback (tell the bot you didn't watch the show after the reminders have already sent)\n!reminder increment (add an episode to the episodes watched count)\n!reminder decrement (remove an episode from the episodes watched count)");
+    currentChannel.send("Commands:\n!reminder set (create a reminder)\n!reminder delete (delete one or more reminders)\n!reminder list (list all existing reminders)\n!reminder setup (set information other than reminders)\n!reminder snooze (cancel timers for the day before they're sent)\n!reminder rollback (tell the bot you didn't watch the show after the reminders have already sent)\n!reminder increment (add an episode to the episodes watched count)\n!reminder decrement (remove an episode from the episodes watched count)\n!reminder calendar (generate a calendar event file for that channel's show)");
   } else if (content === "!neko stop") {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders = [] } = schedule;
@@ -519,8 +598,6 @@ client.on('messageCreate', async msg => {
         return;
       }
     }
-    
-
   }
   // else if (content === "!reminder schedule") {
   //   const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
