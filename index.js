@@ -32,7 +32,7 @@ const generateCalendarEvent = (reminder) => {
     episodesWatched = 0,
     name,
   } = reminder;
-  const channelId = channelCode.slice(2).slice(0, -1);
+  const channelId = channelCode.slice(2, -1);
   const now = new Date();
   const eventDate = nextWatchDate(reminder);
   const makeTwoDigits = (input) => {
@@ -104,12 +104,14 @@ const remindToWatch = (reminder) => {
     role,
     name,
     lastWatchDate,
+    episodes,
+    episodesWatched = 0,
   } = reminder;
   const now = new Date();
   const todayDate = formatDate(now);
   const eventDate = nextWatchDate(reminder);
   const millisecondsUntilEvent = eventDate.getTime() - now.getTime();
-  const channelId = channelCode.slice(2).slice(0, -1);
+  const channelId = channelCode.slice(2, -1);
   if (millisecondsUntilEvent < 0) {
     if (lastWatchDate !== todayDate && todayDate === formatDate(eventDate)) {
       // the show hasn't been marked as watched yet, but it was supposed to be watched and reminded for today
@@ -121,6 +123,11 @@ const remindToWatch = (reminder) => {
   if ((millisecondsUntilEvent - millisecondsInTwoHours) < 0) {
     // skip the 2 hour reminder
     reminderCount++;
+    if ((millisecondsUntilEvent - millisecondsInOneHour) > 0) {
+      // send a makeup reminder
+      const channel = client.channels.cache.get(channelId);
+      channel.send(`${role} time within the next 2 hours! ${emoji}`);
+    }
   } else {
     earlyReminder = setTimeout(() => {
       if (reminderCount === 0) {
@@ -130,11 +137,16 @@ const remindToWatch = (reminder) => {
       }
     }, (millisecondsUntilEvent - millisecondsInTwoHours));
   }
+  let episodesToWatch = 2;
+  if (episodes - episodesWatched === 3) {
+    episodesToWatch = 3;
+  }
+  const episodeText = `${episodesWatched + 1}-${episodesWatched + episodesToWatch}`;
   if ((millisecondsUntilEvent - millisecondsInTenMinutes) < 0) {
     // skip the 10 minute reminder and just remind immediately
     if (reminderCount === 1) {
         const channel = client.channels.cache.get(channelId);
-        channel.send(`${role} time imminently! ${emoji}`);
+        channel.send(`${role} ${episodeText} imminently! ${emoji}`);
         channel.send(`!neko start`);
         reminderCount = 0;
       }
@@ -142,7 +154,7 @@ const remindToWatch = (reminder) => {
     lateReminder = setTimeout(() => {
       if (reminderCount === 1) {
         const channel = client.channels.cache.get(channelId);
-        channel.send(`${role} time in 10 minutes! ${emoji}`);
+        channel.send(`${role} ${episodeText} in 10 minutes! ${emoji}`);
         channel.send(`!neko start`);
         reminderCount = 0;
       }
@@ -315,6 +327,7 @@ const createReminder = (name, channel, role, day, time, cadence = 1, episodes = 
   filteredReminders.push({
     cadence,
     channel,
+    channelId: channel.slice(2, -1),
     day,
     dayIndex,
     emoji,
@@ -352,7 +365,7 @@ const deleteReminder = (reminderKey) => {
 // !reminder help (list all commands)
 // !neko stop (watched phrase by watch party; usually typed when the show is over for the day, so we can watch it to see if the show should be updated)
 client.on('messageCreate', async msg => {
-  const { channelId, content, author } = msg;
+  const { channelId, content, author, guildId } = msg;
   const filter = m => author.id === m.author.id;
   const currentChannel = client.channels.cache.get(channelId);
   if (content === "!reminder set") {
@@ -461,7 +474,7 @@ client.on('messageCreate', async msg => {
       currentChannel.send("That doesn't look like a channel. Please restart setup.");
       return;
     }
-    const scheduleChannelId = channel.slice(2).slice(0, -1);
+    const scheduleChannelId = channel.slice(2, -1);
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     schedule.scheduleChannelId = scheduleChannelId;
     fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
@@ -470,8 +483,7 @@ client.on('messageCreate', async msg => {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders = [] } = schedule;
     const reminder = reminders.find(reminder => {
-      const { channel } = reminder;
-      const reminderChannelId = channel.slice(2).slice(0, -1);
+      const { channelId: reminderChannelId } = reminder;
       return (channelId === reminderChannelId);
     });
     if (reminder && reminder.name) {
@@ -501,8 +513,7 @@ client.on('messageCreate', async msg => {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders = [] } = schedule;
     const reminder = reminders.find(reminder => {
-      const { channel } = reminder;
-      const reminderChannelId = channel.slice(2).slice(0, -1);
+      const { channelId: reminderChannelId } = reminder;
       return (channelId === reminderChannelId);
     });
     const { episodesWatchedLastSession } = reminder;
@@ -529,8 +540,7 @@ client.on('messageCreate', async msg => {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders = [] } = schedule;
     const reminder = reminders.find(reminder => {
-      const { channel } = reminder;
-      const reminderChannelId = channel.slice(2).slice(0, -1);
+      const { channelId: reminderChannelId } = reminder;
       return (channelId === reminderChannelId);
     });
     const { episodesWatched, name } = reminder;
@@ -543,8 +553,7 @@ client.on('messageCreate', async msg => {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders = [] } = schedule;
     const reminder = reminders.find(reminder => {
-      const { channel } = reminder;
-      const reminderChannelId = channel.slice(2).slice(0, -1);
+      const { channelId: reminderChannelId } = reminder;
       return (channelId === reminderChannelId);
     });
     const { episodesWatched, name } = reminder;
@@ -557,8 +566,7 @@ client.on('messageCreate', async msg => {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders = [] } = schedule;
     const reminder = reminders.find(reminder => {
-      const { channel } = reminder;
-      const reminderChannelId = channel.slice(2).slice(0, -1);
+      const { channelId: reminderChannelId } = reminder;
       return (channelId === reminderChannelId);
     });
     if (reminder && reminder.name) {
@@ -566,14 +574,28 @@ client.on('messageCreate', async msg => {
     } else {
       currentChannel.send("No reminder found for this channel.");
     }
-  } else if (content === "!reminder help") {
+  } 
+  // else if (content === "!reminder my calendar") {
+  //   const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
+  //   const { reminders = [] } = schedule;
+  //   const guild = client.guilds.cache.find(guild => guild.id === guildId);
+  //   const { members } = guild;
+  //   const member = members.cache.find(member => member.user.id === author.id);
+  //   const memberRoleIds = member.roles.cache.map(role => role.id);
+  //   const myReminders = reminders.filter(reminder => {
+  //     const { role } = reminder;
+  //     const roleId = role.slice(3, -1);
+  //     return memberRoleIds.includes(roleId);
+  //   });
+  //   console.log(myReminders.map(reminder => reminder.name));
+  // } 
+  else if (content === "!reminder help") {
     currentChannel.send("Commands:\n!reminder set (create a reminder)\n!reminder delete (delete one or more reminders)\n!reminder list (list all existing reminders)\n!reminder setup (set information other than reminders)\n!reminder snooze (cancel timers for the day before they're sent)\n!reminder rollback (tell the bot you didn't watch the show after the reminders have already sent)\n!reminder increment (add an episode to the episodes watched count)\n!reminder decrement (remove an episode from the episodes watched count)\n!reminder calendar (generate a calendar event file for that channel's show)");
   } else if (content === "!neko stop") {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders = [] } = schedule;
     const reminder = reminders.find(reminder => {
-      const { channel } = reminder;
-      const reminderChannelId = channel.slice(2).slice(0, -1);
+      const { channelId: reminderChannelId } = reminder;
       return (channelId === reminderChannelId);
     });
     if (reminder && reminder.name) {
