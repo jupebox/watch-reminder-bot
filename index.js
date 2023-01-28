@@ -27,12 +27,11 @@ const calendarEventLines = fs.readFileSync(CALENDAR_EVENT, {encoding: "utf8"}).t
 const generateCalendarEvent = (reminder) => {
   const {
     cadence,
-    channel: channelCode,
+    channelId,
     episodes,
     episodesWatched = 0,
     name,
   } = reminder;
-  const channelId = channelCode.slice(2, -1);
   const now = new Date();
   const eventDate = nextWatchDate(reminder);
   const makeTwoDigits = (input) => {
@@ -99,7 +98,7 @@ let watchedShow = false;
 
 const remindToWatch = (reminder) => {
   const {
-    channel: channelCode,
+    channelId,
     emoji,
     role,
     name,
@@ -111,7 +110,6 @@ const remindToWatch = (reminder) => {
   const todayDate = formatDate(now);
   const eventDate = nextWatchDate(reminder);
   const millisecondsUntilEvent = eventDate.getTime() - now.getTime();
-  const channelId = channelCode.slice(2, -1);
   if (millisecondsUntilEvent < 0) {
     if (lastWatchDate !== todayDate && todayDate === formatDate(eventDate)) {
       // the show hasn't been marked as watched yet, but it was supposed to be watched and reminded for today
