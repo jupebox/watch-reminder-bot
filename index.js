@@ -166,7 +166,7 @@ const remindToWatch = (reminder) => {
   }, (millisecondsUntilEvent + millisecondsInTwoHours));
 }
 
-const postSchedule = (reminders, scheduleChannelId) => {
+const postSchedule = (reminders, scheduleChannelId, delay = true) => {
   const now = new Date();
   // exclude reminders for shows that aren't happening this week
   // todo: support future start dates for upcoming weekly shows
@@ -228,10 +228,17 @@ const postSchedule = (reminders, scheduleChannelId) => {
   const weekEnd = `${`0${(weekStartDate.getMonth() + 1)}`.slice(-2)}/${`0${weekStartDate.getDate()}`.slice(-2)}`;
   // this function gets called at midnight on Saturday,
   // so this delays the schedule for 8 hours so it doesn't get posted in the middle of the night
-  setTimeout(() => {
+  if (delay) {
+    console.log("Posting schedule in 8 hours");
+    console.log(schedule);
+    setTimeout(() => {
+      const channel = client.channels.cache.get(scheduleChannelId);
+      channel.send(`Anime schedule ${weekStart} - ${weekEnd}:\n${schedule}`);
+    }, (millisecondsInOneHour * 8));
+  } else {
     const channel = client.channels.cache.get(scheduleChannelId);
     channel.send(`Anime schedule ${weekStart} - ${weekEnd}:\n${schedule}`);
-  }, (millisecondsInOneHour * 8));
+  }
 }
 
 // recursive function called once a day at midnight to set the day's reminders
@@ -360,8 +367,11 @@ const deleteReminder = (reminderKey) => {
 // !reminder increment (add an episode to the episodesWatched count)
 // !reminder decrement (remove an episode from the episodesWatched count)
 // !reminder calendar (generate an ics file with the event information)
+// !reminder my calendar (doesn't currently work; planned to get all reminders for the user and generate a single ics file of all of that user's current shows)
+// stretch goal: once hosted, create a server that updates and maintains each user's calendar on a daily basis and delivers the ics file via a link, so that google calendar can poll that link for updates and automatically add and remove shows
 // !reminder help (list all commands)
 // !neko stop (watched phrase by watch party; usually typed when the show is over for the day, so we can watch it to see if the show should be updated)
+// !reminder schedule (if the bot dies before it can post the weekly schedule, post a catchup schedule)
 client.on('messageCreate', async msg => {
   const { channelId, content, author, guildId } = msg;
   const filter = m => author.id === m.author.id;
@@ -430,7 +440,20 @@ client.on('messageCreate', async msg => {
     createReminder(name, channel, role, day, time, cadence, episodes, emoji, startWeek);
     currentChannel.send("Reminder created!");
   } else if (content.indexOf("!reminder delete") === 0) {
-    const reminderKey = content.slice("!reminder delete".length + 1);
+    let reminderKey = content.slice("!reminder delete".length + 1);
+    if (!reminderKey || !reminderKey.length) {
+      currentChannel.send("Which reminder would you like to delete? Please specify role, channel, name, or day.");
+      try {
+        const messages = await currentChannel.awaitMessages({ filter, time: 10000, max: 1, errors: ['time'] });
+        reminderKey = messages.first().content;
+      } catch {
+        currentChannel.send("No key detected. No reminders deleted.");
+      }
+    }
+    if (!reminderKey || !reminderKey.length) {
+      currentChannel.send("No key detected. No reminders deleted.");
+      return;
+    }
     currentChannel.send("Are you sure you want to delete reminders? FYI, deleting by day of the week clears ALL reminders for that day.");
     try {
       const messages = await currentChannel.awaitMessages({ filter, time: 10000, max: 1, errors: ['time'] });
@@ -618,12 +641,11 @@ client.on('messageCreate', async msg => {
         return;
       }
     }
+  } else if (content === "!reminder schedule") {
+    const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
+    const { reminders = [], scheduleChannelId } = schedule;
+    postSchedule(reminders, scheduleChannelId, false);
   }
-  // else if (content === "!reminder schedule") {
-  //   const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
-  //   const { reminders = [], scheduleChannelId } = schedule;
-  //   postSchedule(reminders, scheduleChannelId);
-  // }
 });
 
 client.login(TOKEN);
