@@ -32,9 +32,9 @@ const nextWatchDate = (reminder) => {
     const nextWeekMilliseconds = todayMilliseconds + millisecondsInOneWeek;
     const lastWatchTime = new Date(lastWatchDate).getTime();
     const nextWatchTime = lastWatchTime + Number(cadence) * millisecondsInOneWeek;
-    // todo: make this smarter so it can account for cadences larger than 2
-    if (nextWatchTime >= nextWeekMilliseconds) {
-        daysToAdd += 7;
+    let weeksUntilNextWatch = Math.floor((nextWatchTime - todayMilliseconds) / millisecondsInOneWeek);  
+    if (weeksUntilNextWatch && nextWatchTime >= nextWeekMilliseconds) {
+        daysToAdd = daysToAdd + weeksUntilNextWatch * 7;
     }
     const [hour, minute = 0] = time.split(":");
     eventDate.setHours(hour, minute);
