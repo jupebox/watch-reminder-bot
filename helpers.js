@@ -42,6 +42,18 @@ const nextWatchDate = (reminder) => {
     return eventDate;
 };
 
+const convertTimeZone = (date) => {
+    const now = new Date();
+    const serverTimeZoneOffset = now.getTimezoneOffset();
+    const scheduleTimeZoneOffset = 420; // lmao blaze it; this is PDT. i'm not fucking with PST vs PDT for now because i don't have the, lmao, time for that atm
+    if (serverTimeZoneOffset !== scheduleTimeZoneOffset) {
+        // positive number means the server is in the future (later in the day) than the schedule
+        const hourDifference = (scheduleTimeZoneOffset - serverTimeZoneOffset) / 60;
+        date.setTime(date.getTime() + (hourDifference * millisecondsInOneHour));
+    }
+    return date;
+}
+
 exports.millisecondsInTenMinutes = millisecondsInTenMinutes;
 exports.millisecondsInOneHour = millisecondsInOneHour;
 exports.millisecondsInTwoHours = millisecondsInTwoHours;
@@ -51,3 +63,4 @@ exports.dayIndeces = dayIndeces;
 exports.formatDate = formatDate;
 exports.nextWatchDate = nextWatchDate;
 exports.todayDayIndex = todayDayIndex;
+exports.convertTimeZone = convertTimeZone;

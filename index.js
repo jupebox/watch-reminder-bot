@@ -20,10 +20,12 @@ const {
   formatDate,
   nextWatchDate,
   todayDayIndex,
+  convertTimeZone,
 } = require("./helpers.js");
 
 const calendarEventLines = fs.readFileSync(CALENDAR_EVENT, {encoding: "utf8"}).toString().split("\n");
 
+// todo: add timezone logic here
 const generateCalendarEvent = (reminder) => {
   const {
     cadence,
@@ -108,7 +110,7 @@ const remindToWatch = (reminder) => {
   } = reminder;
   const now = new Date();
   const todayDate = formatDate(now);
-  const eventDate = nextWatchDate(reminder);
+  const eventDate = convertTimeZone(nextWatchDate(reminder));
   const millisecondsUntilEvent = eventDate.getTime() - now.getTime();
   if (millisecondsUntilEvent < 0) {
     if (lastWatchDate !== todayDate && todayDate === formatDate(eventDate)) {
@@ -218,7 +220,7 @@ const postSchedule = (reminders, scheduleChannelId, delay = true) => {
       if ((episodesWatched + episodeCount) === episodes) {
         isFinale = true;
       }
-      const formattedTime = `<t:${Math.round(nextWatchDate.getTime()/1000)}:t>`;
+      const formattedTime = `<t:${Math.round(convertTimeZone(nextWatchDate).getTime()/1000)}:t>`;
       daySchedule = `${upperDay}: ${name} ${episodeText}${isFinale ? " (finale!)" : ""} @ ${formattedTime}`;
     }
     if (message) {
@@ -235,6 +237,7 @@ const postSchedule = (reminders, scheduleChannelId, delay = true) => {
   const weekEnd = `${`0${(weekStartDate.getMonth() + 1)}`.slice(-2)}/${`0${weekStartDate.getDate()}`.slice(-2)}`;
   // this function gets called at midnight on Saturday,
   // so this delays the schedule for 8 hours so it doesn't get posted in the middle of the night
+  // technically this is going to get called at some other time in some other time zone but wow I don't care. as long as it's posted on saturday it's fine
   if (delay) {
     console.log("Posting schedule in 8 hours");
     console.log(schedule);
@@ -349,7 +352,7 @@ const createReminder = (name, channel, role, day, time, cadence = 1, episodes = 
     lastWatchDate: formatDate(new Date(lastWatchDate)),
     name,
     role,
-    time,
+    time, // must be in pacific time for now
   });
   schedule.reminders = filteredReminders.sort((a, b) => {
     return a.dayIndex < b.dayIndex ? -1 : 0;
@@ -481,7 +484,7 @@ client.on('messageCreate', async msg => {
     const list = reminders.reduce((prev, curr) => {
       const { name, cadence, day, emoji, episodes, episodesWatched } = curr;
       const eventDate = nextWatchDate(curr);
-      const formattedTime = `<t:${Math.round((eventDate.getTime())/1000)}:t>`;
+      const formattedTime = `<t:${Math.round((convertTimeZone(eventDate).getTime())/1000)}:t>`;
       const message = episodesWatched >= episodes ? "" : `${emoji} ${name}${Number(cadence) !== 1 ? ` every ${cadence} weeks` : ""} on ${day.slice(0, 1).toUpperCase()}${day.slice(1)} at ${formattedTime}`;
       if (prev) {
         if (message) {
