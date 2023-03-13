@@ -139,7 +139,10 @@ const remindToWatch = (reminder) => {
   if (episodes - episodesWatched === 3) {
     episodesToWatch = 3;
   }
-  const episodeText = `${episodesWatched + 1}-${episodesWatched + episodesToWatch}`;
+  if (episodes - episodesWatched === 1) {
+    episodesToWatch = 1;
+  }
+  const episodeText = episodesToWatch === 1 ? episodesWatched + 1 : `${episodesWatched + 1}-${episodesWatched + episodesToWatch}`;
   if ((millisecondsUntilEvent - millisecondsInTenMinutes) < 0) {
     // skip the 10 minute reminder and just remind immediately
     if (reminderCount === 1) {
@@ -208,11 +211,15 @@ const postSchedule = (reminders, scheduleChannelId, delay = true) => {
       if (episodes - episodesWatched === 3) {
         episodeCount = 3;
       }
+      if (episodes - episodesWatched === 1) {
+        episodeCount = 1;
+      }
+      const episodeText = episodeCount === 1 ? episodesWatched + 1 : `${episodesWatched + 1}-${episodesWatched + episodeCount}`;
       if ((episodesWatched + episodeCount) === episodes) {
         isFinale = true;
       }
       const formattedTime = `<t:${Math.round(nextWatchDate.getTime()/1000)}:t>`;
-      daySchedule = `${upperDay}: ${name} ${episodesWatched + 1}-${episodesWatched + episodeCount}${isFinale ? " (finale!)" : ""} @ ${formattedTime}`;
+      daySchedule = `${upperDay}: ${name} ${episodeText}${isFinale ? " (finale!)" : ""} @ ${formattedTime}`;
     }
     if (message) {
       return `${message}\n${daySchedule}`;
@@ -292,6 +299,7 @@ const watchShow = () => {
     reminder.lastWatchDate = todayDate;
     reminder.episodesWatchedLastSession = episodeCount;
     fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
+    console.log(`Watched ${episodeCount} episodes of ${reminder.name}!`);
   }
   watchedShow = true;
 }
@@ -471,12 +479,15 @@ client.on('messageCreate', async msg => {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders } = schedule;
     const list = reminders.reduce((prev, curr) => {
-      const { name, cadence, day, emoji } = curr;
+      const { name, cadence, day, emoji, episodes, episodesWatched } = curr;
       const eventDate = nextWatchDate(curr);
       const formattedTime = `<t:${Math.round((eventDate.getTime())/1000)}:t>`;
-      const message = `${emoji} ${name}${Number(cadence) !== 1 ? ` every ${cadence} weeks` : ""} on ${day.slice(0, 1).toUpperCase()}${day.slice(1)} at ${formattedTime}`;
+      const message = episodesWatched >= episodes ? "" : `${emoji} ${name}${Number(cadence) !== 1 ? ` every ${cadence} weeks` : ""} on ${day.slice(0, 1).toUpperCase()}${day.slice(1)} at ${formattedTime}`;
       if (prev) {
-      return `${prev}\n${message}`;
+        if (message) {
+          return `${prev}\n${message}`;
+        }
+        return prev;
       }
       return message;
     }, "");
