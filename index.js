@@ -286,12 +286,12 @@ const checkForReminders = () => {
   }, ((hoursUntilTomorrow * 60) + minutesUntilTheHour) * 60 * 1000);
 }
 
-const watchShow = () => {
+const watchShow = (specificReminder) => {
   const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
   const { reminders = [] } = schedule;
   const now = new Date();
   const todayDate = formatDate(now); // strip out time information
-  const reminder = reminders.find(reminder => formatDate(nextWatchDate(reminder)) === todayDate);
+  const reminder = specificReminder ? specificReminder : reminders.find(reminder => formatDate(nextWatchDate(reminder)) === todayDate);
   const { episodes, episodesWatched = 0, lastWatchDate } = reminder;
   let episodeCount = 2;
   if (episodes - episodesWatched === 3) {
@@ -299,7 +299,7 @@ const watchShow = () => {
   }
   if (lastWatchDate !== todayDate) {
     reminder.episodesWatched = episodesWatched + episodeCount;
-    reminder.lastWatchDate = todayDate;
+    reminder.lastWatchDate = specificReminder ? formatDate(nextWatchDate(reminder)) : todayDate;
     reminder.episodesWatchedLastSession = episodeCount;
     fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
     console.log(`Watched ${episodeCount} episodes of ${reminder.name}!`);
@@ -378,6 +378,7 @@ const deleteReminder = (reminderKey) => {
 // !reminder increment (add an episode to the episodesWatched count)
 // !reminder decrement (remove an episode from the episodesWatched count)
 // !reminder calendar (generate an ics file with the event information)
+// !reminder watch (sets the watch date to the most recent expected watch date and updates the episode counts)
 // !reminder my calendar (doesn't currently work; planned to get all reminders for the user and generate a single ics file of all of that user's current shows)
 // stretch goal: once hosted, create a server that updates and maintains each user's calendar on a daily basis and delivers the ics file via a link, so that google calendar can poll that link for updates and automatically add and remove shows
 // !reminder help (list all commands)
@@ -609,7 +610,20 @@ client.on('messageCreate', async msg => {
     } else {
       currentChannel.send("No reminder found for this channel.");
     }
-  } 
+  } else if (content === "!reminder watch") {
+    const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
+    const { reminders = [] } = schedule;
+    const reminder = reminders.find(reminder => {
+      const { channelId: reminderChannelId } = reminder;
+      return (channelId === reminderChannelId);
+    });
+    if (reminder && reminder.name) {
+      watchShow(reminder);
+      currentChannel.send("Ok, marked the show as watched on the last expected watch date!");
+    } else {
+      currentChannel.send("No reminder found for this channel.");
+    }
+  }
   // else if (content === "!reminder my calendar") {
   //   const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
   //   const { reminders = [] } = schedule;
