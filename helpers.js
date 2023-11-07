@@ -45,7 +45,7 @@ const nextWatchDate = (reminder) => {
 const isDST = (date) => {
     let jan = new Date(date.getFullYear(), 0, 1).getTimezoneOffset();
     let jul = new Date(date.getFullYear(), 6, 1).getTimezoneOffset();
-    return Math.max(jan, jul) !== d.getTimezoneOffset();
+    return Math.max(jan, jul) !== date.getTimezoneOffset();
 }
 
 const convertTimeZone = (date) => {
