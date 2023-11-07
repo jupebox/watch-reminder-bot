@@ -42,10 +42,18 @@ const nextWatchDate = (reminder) => {
     return eventDate;
 };
 
+const isDST = (date) => {
+    let jan = new Date(date.getFullYear(), 0, 1).getTimezoneOffset();
+    let jul = new Date(date.getFullYear(), 6, 1).getTimezoneOffset();
+    return Math.max(jan, jul) !== d.getTimezoneOffset();
+}
+
 const convertTimeZone = (date) => {
     const now = new Date();
     const serverTimeZoneOffset = now.getTimezoneOffset();
-    const scheduleTimeZoneOffset = 420; // lmao blaze it; this is PDT. i'm not fucking with PST vs PDT for now because i don't have the, lmao, time for that atm
+    const standardTimeOffset = 480;
+    const daylightTimeOffset = 420;
+    const scheduleTimeZoneOffset = isDST(now) ? daylightTimeOffset : standardTimeOffset;
     if (serverTimeZoneOffset !== scheduleTimeZoneOffset) {
         // positive number means the server is in the future (later in the day) than the schedule
         const hourDifference = (scheduleTimeZoneOffset - serverTimeZoneOffset) / 60;
