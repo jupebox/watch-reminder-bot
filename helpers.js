@@ -28,9 +28,10 @@ const nextWatchDate = (reminder) => {
     const nextWatchTime = lastWatchTime + (Number(cadence) * millisecondsInOneWeek);
     let eventDate = new Date(nextWatchTime);
     const now = new Date();
-    const timeZoneOffset = now.getTimezoneOffset() / 60;
+    const today = formatDate(now);
+    const todayDate = new Date(today);
     const [hour, minute = 0] = time.split(":");
-    eventDate.setHours((Number(hour) + timeZoneOffset), minute);
+    eventDate.setHours((Number(hour) + todayDate.getHours()), minute);
     // if that day is not the right day of the week, subtract days equal to the difference?
     // the next watch date should be the day of the week that the show is watched on
     const eventDateDayIndex = eventDate.getDay();

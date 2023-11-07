@@ -691,7 +691,7 @@ client.on('messageCreate', async msg => {
       const { channelId: reminderChannelId } = reminder;
       return (channelId === reminderChannelId);
     });
-    const { episodesWatched, name, lastWatchDate, time } = reminder;
+    const { episodes, episodesWatched, name, lastWatchDate, time } = reminder;
     if (reminder && reminder.name) {
       currentChannel.send(`What about the ${name} reminder do you want to edit? Try "date", "time", or "episodes".`);
       try {
