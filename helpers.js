@@ -23,22 +23,24 @@ const todayDayIndex = () => {
 
 const nextWatchDate = (reminder) => {
     const { cadence, dayIndex, lastWatchDate, time } = reminder;
-    const now = new Date();
-    const today = formatDate(now);
-    const eventDate = new Date();
-    const dayDateIndex = dayIndex === 6 ? 0 : dayIndex + 1;
-    let daysToAdd = (dayDateIndex + 7 - eventDate.getDay()) % 7;
-    const todayMilliseconds = new Date(today).getTime();
-    const nextWeekMilliseconds = todayMilliseconds + millisecondsInOneWeek;
+    // get the last watched date and add to it the number of weeks that should be between watches
     const lastWatchTime = new Date(lastWatchDate).getTime();
-    const nextWatchTime = lastWatchTime + Number(cadence) * millisecondsInOneWeek;
-    let weeksUntilNextWatch = Math.floor((nextWatchTime - todayMilliseconds) / millisecondsInOneWeek);  
-    if (weeksUntilNextWatch && nextWatchTime >= nextWeekMilliseconds) {
-        daysToAdd = daysToAdd + weeksUntilNextWatch * 7;
-    }
+    const nextWatchTime = lastWatchTime + (Number(cadence) * millisecondsInOneWeek);
+    let eventDate = new Date(nextWatchTime);
+    const now = new Date();
+    const timeZoneOffset = now.getTimezoneOffset() / 60;
     const [hour, minute = 0] = time.split(":");
-    eventDate.setHours(hour, minute);
-    eventDate.setTime(eventDate.getTime() + daysToAdd * millisecondsInOneDay);
+    eventDate.setHours((Number(hour) + timeZoneOffset), minute);
+    eventDate = convertTimeZone(eventDate);
+    // if that day is not the right day of the week, subtract days equal to the difference?
+    // the next watch date should be the day of the week that the show is watched on
+    const eventDateDayIndex = eventDate.getDay();
+    const dayDateIndex = dayIndex === 6 ? 0 : dayIndex + 1;
+    const dayIndexDiff = eventDateDayIndex - dayDateIndex;
+    if (dayIndexDiff) {
+        const daysToSubtract = dayIndexDiff > 0 ? dayIndexDiff : dayIndexDiff + 7;
+        eventDate.setTime(eventDate.getTime() - (daysToSubtract * millisecondsInOneDay))
+    }
     return eventDate;
 };
 

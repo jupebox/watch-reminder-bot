@@ -25,7 +25,16 @@ const {
 
 const calendarEventLines = fs.readFileSync(CALENDAR_EVENT, {encoding: "utf8"}).toString().split("\n");
 
-// todo: add timezone logic here
+const log = (message) => {
+  console.log(message);
+  const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
+  const { logChannelId } = schedule;
+  if (logChannelId) {
+    const channel = client.channels.cache.get(logChannelId);
+    channel.send(message);
+  }
+}
+
 const generateCalendarEvent = (reminder) => {
   const {
     cadence,
@@ -119,7 +128,7 @@ const remindToWatch = (reminder) => {
     }
     return;
   }
-  console.log(`setting reminders for ${name}! ${Math.round(millisecondsUntilEvent / 1000 / 60 / 60)} hours until the event.`);
+  log(`setting reminders for ${name}! ${Math.round(millisecondsUntilEvent / 1000 / 60 / 60)} hours until the event.`);
   if ((millisecondsUntilEvent - millisecondsInTwoHours) < 0) {
     // skip the 2 hour reminder
     reminderCount++;
@@ -239,8 +248,8 @@ const postSchedule = (reminders, scheduleChannelId, delay = true) => {
   // so this delays the schedule for 8 hours so it doesn't get posted in the middle of the night
   // technically this is going to get called at some other time in some other time zone but wow I don't care. as long as it's posted on saturday it's fine
   if (delay) {
-    console.log("Posting schedule in 8 hours");
-    console.log(schedule);
+    log("Posting schedule in 8 hours");
+    log(schedule);
     setTimeout(() => {
       const channel = client.channels.cache.get(scheduleChannelId);
       channel.send(`Anime schedule ${weekStart} - ${weekEnd}:\n${schedule}`);
@@ -302,13 +311,13 @@ const watchShow = (specificReminder) => {
     reminder.lastWatchDate = specificReminder ? formatDate(nextWatchDate(reminder)) : todayDate;
     reminder.episodesWatchedLastSession = episodeCount;
     fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
-    console.log(`Watched ${episodeCount} episodes of ${reminder.name}!`);
+    log(`Watched ${episodeCount} episodes of ${reminder.name}!`);
   }
   watchedShow = true;
 }
 
 client.on('ready', () => {
-  console.log(`Logged in as ${client.user.tag}!`);
+  log(`Logged in as ${client.user.tag}!`);
   checkForReminders();
 });
 
@@ -373,6 +382,7 @@ const deleteReminder = (reminderKey) => {
 // !reminder delete (delete one or more reminders)
 // !reminder list (generate a list of all existing reminders)
 // !reminder setup (set information other than reminders)
+// !reminder log setup (set log channel)
 // !reminder snooze (cancel timers for the day before they fire)
 // !reminder rollback (after a show has been reminded for, decrement episodes for that event to what they were before the event)
 // !reminder increment (add an episode to the episodesWatched count)
@@ -392,7 +402,7 @@ client.on('messageCreate', async msg => {
     let name, channel, role, day, time, cadence, episodes, emoji, startWeek = 0;
     currentChannel.send("What's the name of the show?");
     try {
-      const messages = await currentChannel.awaitMessages({ filter, time: 10000, max: 1, errors: ['time'] });
+      const messages = await currentChannel.awaitMessages({ filter, time: 20000, max: 1, errors: ['time'] });
       name = messages.first().content;
     } catch {
       currentChannel.send("Request timed out. Reminder not created.");
@@ -444,7 +454,7 @@ client.on('messageCreate', async msg => {
         }
         return;
       } catch (err) {
-        console.log(err);
+        log(err);
         currentChannel.send("Request timed out. Existing reminder not replaced.");
         return;
       }
@@ -515,6 +525,25 @@ client.on('messageCreate', async msg => {
     schedule.scheduleChannelId = scheduleChannelId;
     fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
     currentChannel.send("Channel set!");
+  } else if (content === "!reminder log setup") {
+    currentChannel.send("In which channel should the logs be posted?");
+    let channel;
+    try {
+      const messages = await currentChannel.awaitMessages({ filter, time: 20000, max: 1, errors: ['time'] });
+      channel = messages.first().content;
+    } catch {
+      currentChannel.send("Request timed out. Setup failed.");
+      return;
+    }
+    if (channel && channel.slice(0, 2) !== "<#") {
+      currentChannel.send("That doesn't look like a channel. Please restart log setup.");
+      return;
+    }
+    const logChannelId = channel.slice(2, -1);
+    const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
+    schedule.logChannelId = logChannelId;
+    fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
+    currentChannel.send("Channel set!");
   } else if (content === "!reminder snooze") {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders = [] } = schedule;
@@ -540,7 +569,7 @@ client.on('messageCreate', async msg => {
         }
         return;
       } catch (err) {
-        console.log(err);
+        log(err);
         currentChannel.send("Request timed out. Reminders not canceled.");
         return;
       }
@@ -552,22 +581,22 @@ client.on('messageCreate', async msg => {
       const { channelId: reminderChannelId } = reminder;
       return (channelId === reminderChannelId);
     });
-    const { episodesWatchedLastSession } = reminder;
+    const { episodesWatchedLastSession, episodesWatched = 0 } = reminder;
     if (reminder && reminder.name) {
-      currentChannel.send(`Did you skip watching ${reminder.name} today?`);
+      currentChannel.send(`Reset episode count for ${reminder.name} from ${episodesWatched} to ${episodesWatched - episodesWatchedLastSession}?`);
       try {
         const messages = await currentChannel.awaitMessages({ filter, time: 10000, max: 1, errors: ['time'] });
         const msg = messages.first().content;
         if (msg.slice(0, 1).toLowerCase() === "y") {
           reminder.episodesWatched = reminder.episodesWatched - episodesWatchedLastSession;
           fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
-          currentChannel.send("Ok, the episode count has been reset.");
+          currentChannel.send(`Ok, the episode count has been set to ${episodesWatched - episodesWatchedLastSession}.`);
         } else {
-          currentChannel.send(`Hope you enjoyed those ${episodesWatchedLastSession} episodes!`);
+          currentChannel.send(`Episode count left at ${episodesWatched}.`);
         }
         return;
       } catch (err) {
-        console.log(err);
+        log(err);
         currentChannel.send("Request timed out.");
         return;
       }
@@ -636,10 +665,10 @@ client.on('messageCreate', async msg => {
   //     const roleId = role.slice(3, -1);
   //     return memberRoleIds.includes(roleId);
   //   });
-  //   console.log(myReminders.map(reminder => reminder.name));
+  //   log(myReminders.map(reminder => reminder.name));
   // } 
   else if (content === "!reminder help") {
-    currentChannel.send("Commands:\n!reminder set (create a reminder)\n!reminder delete (delete one or more reminders)\n!reminder list (list all existing reminders)\n!reminder setup (set information other than reminders)\n!reminder snooze (cancel timers for the day before they're sent)\n!reminder rollback (tell the bot you didn't watch the show after the reminders have already sent)\n!reminder increment (add an episode to the episodes watched count)\n!reminder decrement (remove an episode from the episodes watched count)\n!reminder calendar (generate a calendar event file for that channel's show)");
+    currentChannel.send("Commands:\n!reminder set (create a reminder)\n!reminder delete (delete one or more reminders)\n!reminder list (list all existing reminders)\n!reminder setup (set information other than reminders)\n!reminder log setup (set the log channel)\n!reminder snooze (cancel timers for the day before they're sent)\n!reminder rollback (tell the bot you didn't watch the show after the reminders have already sent)\n!reminder increment (add an episode to the episodes watched count)\n!reminder decrement (remove an episode from the episodes watched count)\n!reminder calendar (generate a calendar event file for that channel's show)");
   } else if (content === "!neko stop") {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders = [] } = schedule;
@@ -648,26 +677,8 @@ client.on('messageCreate', async msg => {
       return (channelId === reminderChannelId);
     });
     if (reminder && reminder.name) {
-      currentChannel.send(`Did you watch ${reminder.name} today?`);
-      try {
-        const messages = await currentChannel.awaitMessages({ filter, time: 10000, max: 1, errors: ['time'] });
-        const msg = messages.first().content;
-        if (msg.slice(0, 1).toLowerCase() === "y") {
-          clearTimeout(cleanupTimer);
-          watchShow();
-          currentChannel.send("Ok, episode count updated. Hope they were good ones!");
-        } else {
-          clearTimeout(cleanupTimer);
-          reminder.lastWatchDate = formatDate(new Date());
-          fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
-          currentChannel.send("Ok, episode count not updated.");
-        }
-        return;
-      } catch (err) {
-        console.log(err);
-        currentChannel.send("Request timed out.");
-        return;
-      }
+      clearTimeout(cleanupTimer);
+      watchShow();
     }
   } else if (content === "!reminder schedule") {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
