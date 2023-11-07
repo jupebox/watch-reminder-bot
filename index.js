@@ -422,8 +422,8 @@ client.on('messageCreate', async msg => {
     }
 
     let number = 0;
-    if (cadence && Number(cadence) !== 1) {
-      currentChannel.send(`The cadence for this show is every ${cadence} weeks. Which week should it begin? 0 for this week, 1 for next week, -1 for last week, etc.`);
+    if (cadence) {
+      currentChannel.send(`The cadence for this show is every ${cadence} week(s). Which week should it begin? 0 for this week, 1 for next week, -1 for last week, etc.`);
       try {
         const messages = await currentChannel.awaitMessages({ filter, time: 10000, max: 1, errors: ['time'] });
         number = messages.first().content;
@@ -684,6 +684,76 @@ client.on('messageCreate', async msg => {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders = [], scheduleChannelId } = schedule;
     postSchedule(reminders, scheduleChannelId, false);
+  } else if (content === "!reminder edit") {
+    const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
+    const { reminders = [] } = schedule;
+    const reminder = reminders.find(reminder => {
+      const { channelId: reminderChannelId } = reminder;
+      return (channelId === reminderChannelId);
+    });
+    const { episodesWatched, name, lastWatchDate, time } = reminder;
+    if (reminder && reminder.name) {
+      currentChannel.send(`What about the ${name} reminder do you want to edit? Try "date", "time", or "episodes".`);
+      try {
+        const messages = await currentChannel.awaitMessages({ filter, time: 20000, max: 1, errors: ['time'] });
+        const msg = messages.first().content;
+        if (msg.trim().toLowerCase() === "date") {
+          currentChannel.send(`The date ${name} was last watched is ${lastWatchDate}. The next expected watch date is ${nextWatchDate(reminder)}. Modifying the last watched date will update the next watch date according to the cadence and other reminder rules. What should the new last watched date be?`);
+          try {
+            const messages = await currentChannel.awaitMessages({ filter, time: 20000, max: 1, errors: ['time'] });
+            const msg = messages.first().content;
+            if (isNaN(new Date(msg).getTime())) {
+              currentChannel.send("I can't parse that date. Please format it like MM-DD-YYYY.");
+            } else {
+              reminder.lastWatchDate = msg;
+              fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
+              currentChannel.send(`The next expected watch date is now ${nextWatchDate(reminder)}!`);
+            }
+          } catch (err) {
+            log(err);
+            currentChannel.send("Request timed out.");
+            return;
+          }
+        } else if (msg.trim().toLowerCase() === "time") {
+          currentChannel.send(`${name} is currently watched at ${time} pacific. What time would you like to watch it at?`);
+          try {
+            const messages = await currentChannel.awaitMessages({ filter, time: 20000, max: 1, errors: ['time'] });
+            const msg = messages.first().content;
+            reminder.time = msg;
+            fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
+            currentChannel.send(`${name} will now be watched at ${reminder.time}!`);
+          } catch (err) {
+            log(err);
+            currentChannel.send("Request timed out.");
+            return;
+          }
+        } else if (msg.trim().toLowerCase() === "episodes") {
+          currentChannel.send(`You have watched ${episodesWatched} out of ${episodes} episodes for ${name}. To update just the number of episodes total, type one number. To update both, type the total episodes first, followed by the number of episodes you have watched already, separated by a space. To update just the number of episodes watched, try the "watch", "increment", or "decrement" commands.`);
+          try {
+            const messages = await currentChannel.awaitMessages({ filter, time: 20000, max: 1, errors: ['time'] });
+            const msg = messages.first().content;
+            const [total, watched] = msg.split(" ");
+            if (total && Number(total)) {
+              reminder.episodes = Number(total);
+            }
+            if (watched && Number(watched)) {
+              reminder.episodesWatched = Number(watched);
+            }
+            fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
+            currentChannel.send(`You have now watched ${reminder.episodesWatched} out of ${reminder.episodes} episodes of ${name}!`);
+          } catch (err) {
+            log(err);
+            currentChannel.send("Request timed out.");
+            return;
+          }
+        }
+        return;
+      } catch (err) {
+        log(err);
+        currentChannel.send("Request timed out.");
+        return;
+      }
+    }
   }
 });
 
