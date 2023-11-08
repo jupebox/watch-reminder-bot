@@ -9,7 +9,11 @@ const dayIndeces = ["monday", "tuesday", "wednesday", "thursday", "friday", "sat
 
 // iirc this is the date format that all browsers can agree is a valid date. don't quote me on that
 const formatDate = date => {
-    return `${date.getMonth() + 1}-${date.getDate()}-${date.getFullYear()}`;
+    let dateDate = date;
+    if (typeof date === "string") {
+        dateDate = new Date(date);
+    }
+    return `${dateDate.getMonth() + 1}-${dateDate.getDate()}-${dateDate.getFullYear()}`;
 }
 
 const todayDayIndex = () => {
@@ -21,17 +25,26 @@ const todayDayIndex = () => {
     return nowDayIndex;
 }
 
+const convertReminderTimeStampToBetterTimeStamp = (date, time) => {
+    // YYYY-MM-DDTHH:mm:ss.sssZ
+    const [hour, minute = "00"] = time.split(":");
+    const [month, day, year] = date.split("-");
+    const make2Digits = (string) => {
+        const number = Number(string);
+        return number < 10 ? `0${number}` : number;
+    }
+    const timeStamp = `${year}-${make2Digits(month)}-${make2Digits(day)}T${make2Digits(hour)}:${make2Digits(minute)}:00.000+${isDST(new Date()) ? "07" : "08"}:00`;
+    console.log(timeStamp);
+    return timeStamp;
+}
+
 const nextWatchDate = (reminder) => {
-    const { cadence, dayIndex, lastWatchDate, time } = reminder;
-    // get the last watched date and add to it the number of weeks that should be between watches
-    const lastWatchTime = new Date(lastWatchDate).getTime();
-    const nextWatchTime = lastWatchTime + (Number(cadence) * millisecondsInOneWeek);
-    let eventDate = new Date(nextWatchTime);
-    const now = new Date();
-    const today = formatDate(now);
-    const todayDate = new Date(today);
-    const [hour, minute = 0] = time.split(":");
-    eventDate.setHours((Number(hour) + todayDate.getHours()), minute);
+    const { cadence, dayIndex, lastWatchDate: lastWatched, time } = reminder;
+    const lastWatchTimeStamp = convertReminderTimeStampToBetterTimeStamp(lastWatched, time);
+    const lastWatchDate = new Date(lastWatchTimeStamp);
+    const lastWatchTime = lastWatchDate.getTime();
+    const eventDate = new Date(lastWatchTime + (Number(cadence) * millisecondsInOneWeek));
+    return eventDate;
     // // if that day is not the right day of the week, subtract days equal to the difference?
     // // the next watch date should be the day of the week that the show is watched on
     // const eventDateDayIndex = eventDate.getDay();
@@ -41,7 +54,8 @@ const nextWatchDate = (reminder) => {
     //     const daysToSubtract = dayIndexDiff > 0 ? dayIndexDiff : dayIndexDiff + 7;
     //     eventDate.setTime(eventDate.getTime() - (daysToSubtract * millisecondsInOneDay))
     // }
-    return eventDate;
+    // return eventDate;
+    return new Date();
 };
 
 const isDST = (date) => {
