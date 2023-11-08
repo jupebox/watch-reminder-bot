@@ -33,13 +33,13 @@ const convertReminderTimeStampToBetterTimeStamp = (date, time) => {
         const number = Number(string);
         return number < 10 ? `0${number}` : number;
     }
-    const timeStamp = `${year}-${make2Digits(month)}-${make2Digits(day)}T${make2Digits(hour)}:${make2Digits(minute)}:00.000+${isDST(new Date()) ? "07" : "08"}:00`;
-    console.log(timeStamp);
+    const timeStamp = `${year}-${make2Digits(month)}-${make2Digits(day)}T${make2Digits(hour)}:${make2Digits(minute)}:00.000`; //+${isDST(new Date()) ? "07" : "08"}:00
+    // console.log(timeStamp);
     return timeStamp;
 }
 
 const nextWatchDate = (reminder) => {
-    const { cadence, dayIndex, lastWatchDate: lastWatched, time } = reminder;
+    const { cadence, lastWatchDate: lastWatched, time } = reminder;
     const lastWatchTimeStamp = convertReminderTimeStampToBetterTimeStamp(lastWatched, time);
     const lastWatchDate = new Date(lastWatchTimeStamp);
     const lastWatchTime = lastWatchDate.getTime();
@@ -55,7 +55,6 @@ const nextWatchDate = (reminder) => {
     //     eventDate.setTime(eventDate.getTime() - (daysToSubtract * millisecondsInOneDay))
     // }
     // return eventDate;
-    return new Date();
 };
 
 const isDST = (date) => {
