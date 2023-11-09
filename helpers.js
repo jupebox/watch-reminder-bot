@@ -33,8 +33,7 @@ const convertReminderTimeStampToBetterTimeStamp = (date, time) => {
         const number = Number(string);
         return number < 10 ? `0${number}` : number;
     }
-    const timeStamp = `${year}-${make2Digits(month)}-${make2Digits(day)}T${make2Digits(hour)}:${make2Digits(minute)}:00.000`; //+${isDST(new Date()) ? "07" : "08"}:00
-    // console.log(timeStamp);
+    const timeStamp = `${year}-${make2Digits(month)}-${make2Digits(day)}T${make2Digits(hour)}:${make2Digits(minute)}:00.000-${isDST(new Date()) ? "07" : "08"}:00`;
     return timeStamp;
 }
 
