@@ -558,6 +558,8 @@ client.on('messageCreate', async msg => {
     fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
     currentChannel.send("Channel set!");
   } else if (content === "!reminder debug") {
+    const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
+    const { reminders } = schedule;
     const reminder = reminders.find(reminder => {
       const { channelId: reminderChannelId } = reminder;
       return (channelId === reminderChannelId);
