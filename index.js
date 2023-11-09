@@ -20,7 +20,6 @@ const {
   formatDate,
   nextWatchDate,
   todayDayIndex,
-  convertTimeZone,
 } = require("./helpers.js");
 
 const calendarEventLines = fs.readFileSync(CALENDAR_EVENT, {encoding: "utf8"}).toString().split("\n");
@@ -119,7 +118,7 @@ const remindToWatch = (reminder) => {
   } = reminder;
   const now = new Date();
   const todayDate = formatDate(now);
-  const eventDate = convertTimeZone(nextWatchDate(reminder));
+  const eventDate = nextWatchDate(reminder);
   const millisecondsUntilEvent = eventDate.getTime() - now.getTime();
   if (millisecondsUntilEvent < 0) {
     if (lastWatchDate !== todayDate && todayDate === formatDate(eventDate)) {
@@ -229,7 +228,7 @@ const postSchedule = (reminders, scheduleChannelId, delay = true) => {
       if ((episodesWatched + episodeCount) === episodes) {
         isFinale = true;
       }
-      const formattedTime = `<t:${Math.round(convertTimeZone(nextWatchDate).getTime()/1000)}:t>`;
+      const formattedTime = `<t:${Math.round(nextWatchDate).getTime()/1000}:t>`;
       daySchedule = `${upperDay}: ${name} ${episodeText}${isFinale ? " (finale!)" : ""} @ ${formattedTime}`;
     }
     if (message) {
@@ -257,6 +256,19 @@ const postSchedule = (reminders, scheduleChannelId, delay = true) => {
   } else {
     const channel = client.channels.cache.get(scheduleChannelId);
     channel.send(`Anime schedule ${weekStart} - ${weekEnd}:\n${schedule}`);
+  }
+}
+
+const dumpSchedule = (reminder) => {
+  const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
+  const { reminders = [], logChannelId } = schedule;
+  if (logChannelId) {
+    const channel = client.channels.cache.get(logChannelId);
+    if (reminder) {
+      channel.send(JSON.stringify(reminder));
+    } else {
+      channel.send(JSON.stringify(reminders));
+    }
   }
 }
 
@@ -383,6 +395,7 @@ const deleteReminder = (reminderKey) => {
 // !reminder list (generate a list of all existing reminders)
 // !reminder setup (set information other than reminders)
 // !reminder log setup (set log channel)
+// !reminder debug (dump the whole schedule to the logs channel)
 // !reminder snooze (cancel timers for the day before they fire)
 // !reminder rollback (after a show has been reminded for, decrement episodes for that event to what they were before the event)
 // !reminder increment (add an episode to the episodesWatched count)
@@ -495,7 +508,7 @@ client.on('messageCreate', async msg => {
     const list = reminders.reduce((prev, curr) => {
       const { name, cadence, day, emoji, episodes, episodesWatched } = curr;
       const eventDate = nextWatchDate(curr);
-      const formattedTime = `<t:${Math.round((convertTimeZone(eventDate).getTime())/1000)}:t>`;
+      const formattedTime = `<t:${Math.round((eventDate).getTime()/1000)}:t>`;
       const message = episodesWatched >= episodes ? "" : `${emoji} ${name}${Number(cadence) !== 1 ? ` every ${cadence} weeks` : ""} on ${day.slice(0, 1).toUpperCase()}${day.slice(1)} at ${formattedTime}`;
       if (prev) {
         if (message) {
@@ -544,6 +557,16 @@ client.on('messageCreate', async msg => {
     schedule.logChannelId = logChannelId;
     fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
     currentChannel.send("Channel set!");
+  } else if (content === "!reminder debug") {
+    const reminder = reminders.find(reminder => {
+      const { channelId: reminderChannelId } = reminder;
+      return (channelId === reminderChannelId);
+    });
+    if (reminder && reminder.name) {
+      dumpSchedule(reminder);
+    } else {
+      dumpSchedule();
+    }
   } else if (content === "!reminder snooze") {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders = [] } = schedule;
@@ -668,7 +691,7 @@ client.on('messageCreate', async msg => {
   //   log(myReminders.map(reminder => reminder.name));
   // } 
   else if (content === "!reminder help") {
-    currentChannel.send("Commands:\n!reminder set (create a reminder)\n!reminder delete (delete one or more reminders)\n!reminder list (list all existing reminders)\n!reminder setup (set information other than reminders)\n!reminder log setup (set the log channel)\n!reminder snooze (cancel timers for the day before they're sent)\n!reminder rollback (tell the bot you didn't watch the show after the reminders have already sent)\n!reminder increment (add an episode to the episodes watched count)\n!reminder decrement (remove an episode from the episodes watched count)\n!reminder calendar (generate a calendar event file for that channel's show)");
+    currentChannel.send("Commands:\n!reminder set (create a reminder)\n!reminder delete (delete one or more reminders)\n!reminder list (list all existing reminders)\n!reminder setup (set information other than reminders)\n!reminder log setup (set the log channel)\n!reminder debug (dump the schedule for the current channel's reminder in the log channel)\n!reminder snooze (cancel timers for the day before they're sent)\n!reminder rollback (tell the bot you didn't watch the show after the reminders have already sent)\n!reminder increment (add an episode to the episodes watched count)\n!reminder decrement (remove an episode from the episodes watched count)\n!reminder calendar (generate a calendar event file for that channel's show)\n!reminder watch (mark the current channel's show as watched)\n!reminder schedule (post the schedule to the schedule channel)\n!reminder edit (modify an existing reminder)");
   } else if (content === "!neko stop") {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders = [] } = schedule;

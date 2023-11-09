@@ -33,8 +33,13 @@ const convertReminderTimeStampToBetterTimeStamp = (date, time) => {
         const number = Number(string);
         return number < 10 ? `0${number}` : number;
     }
-    const timeStamp = `${year}-${make2Digits(month)}-${make2Digits(day)}T${make2Digits(hour)}:${make2Digits(minute)}:00.000-${isDST(new Date()) ? "07" : "08"}:00`;
-    return timeStamp;
+    return `${year}-${make2Digits(month)}-${make2Digits(day)}T${make2Digits(hour)}:${make2Digits(minute)}:00.000-${isDST(new Date()) ? "07" : "08"}:00`;
+}
+
+const isDST = (date) => {
+    let jan = new Date(date.getFullYear(), 0, 1).getTimezoneOffset();
+    let jul = new Date(date.getFullYear(), 6, 1).getTimezoneOffset();
+    return Math.max(jan, jul) !== date.getTimezoneOffset();
 }
 
 const nextWatchDate = (reminder) => {
@@ -56,26 +61,6 @@ const nextWatchDate = (reminder) => {
     // return eventDate;
 };
 
-const isDST = (date) => {
-    let jan = new Date(date.getFullYear(), 0, 1).getTimezoneOffset();
-    let jul = new Date(date.getFullYear(), 6, 1).getTimezoneOffset();
-    return Math.max(jan, jul) !== date.getTimezoneOffset();
-}
-
-const convertTimeZone = (date) => {
-    // const now = new Date();
-    // const serverTimeZoneOffset = now.getTimezoneOffset();
-    // const standardTimeOffset = 480;
-    // const daylightTimeOffset = 420;
-    // const scheduleTimeZoneOffset = isDST(now) ? daylightTimeOffset : standardTimeOffset;
-    // if (serverTimeZoneOffset !== scheduleTimeZoneOffset) {
-    //     // positive number means the server is in the future (later in the day) than the schedule
-    //     const hourDifference = (scheduleTimeZoneOffset - serverTimeZoneOffset) / 60;
-    //     date.setTime(date.getTime() + (hourDifference * millisecondsInOneHour));
-    // }
-    return date;
-}
-
 exports.millisecondsInTenMinutes = millisecondsInTenMinutes;
 exports.millisecondsInOneHour = millisecondsInOneHour;
 exports.millisecondsInTwoHours = millisecondsInTwoHours;
@@ -85,4 +70,3 @@ exports.dayIndeces = dayIndeces;
 exports.formatDate = formatDate;
 exports.nextWatchDate = nextWatchDate;
 exports.todayDayIndex = todayDayIndex;
-exports.convertTimeZone = convertTimeZone;
