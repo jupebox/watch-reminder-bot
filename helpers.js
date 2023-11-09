@@ -63,16 +63,16 @@ const isDST = (date) => {
 }
 
 const convertTimeZone = (date) => {
-    const now = new Date();
-    const serverTimeZoneOffset = now.getTimezoneOffset();
-    const standardTimeOffset = 480;
-    const daylightTimeOffset = 420;
-    const scheduleTimeZoneOffset = isDST(now) ? daylightTimeOffset : standardTimeOffset;
-    if (serverTimeZoneOffset !== scheduleTimeZoneOffset) {
-        // positive number means the server is in the future (later in the day) than the schedule
-        const hourDifference = (scheduleTimeZoneOffset - serverTimeZoneOffset) / 60;
-        date.setTime(date.getTime() + (hourDifference * millisecondsInOneHour));
-    }
+    // const now = new Date();
+    // const serverTimeZoneOffset = now.getTimezoneOffset();
+    // const standardTimeOffset = 480;
+    // const daylightTimeOffset = 420;
+    // const scheduleTimeZoneOffset = isDST(now) ? daylightTimeOffset : standardTimeOffset;
+    // if (serverTimeZoneOffset !== scheduleTimeZoneOffset) {
+    //     // positive number means the server is in the future (later in the day) than the schedule
+    //     const hourDifference = (scheduleTimeZoneOffset - serverTimeZoneOffset) / 60;
+    //     date.setTime(date.getTime() + (hourDifference * millisecondsInOneHour));
+    // }
     return date;
 }
 
