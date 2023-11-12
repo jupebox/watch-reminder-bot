@@ -228,7 +228,7 @@ const postSchedule = (reminders, scheduleChannelId, delay = true) => {
       if ((episodesWatched + episodeCount) === episodes) {
         isFinale = true;
       }
-      const formattedTime = `<t:${Math.round(nextWatchDate).getTime()/1000}:t>`;
+      const formattedTime = `<t:${Math.round(nextWatchDate.getTime()/1000)}:t>`;
       daySchedule = `${upperDay}: ${name} ${episodeText}${isFinale ? " (finale!)" : ""} @ ${formattedTime}`;
     }
     if (message) {
@@ -508,7 +508,7 @@ client.on('messageCreate', async msg => {
     const list = reminders.reduce((prev, curr) => {
       const { name, cadence, day, emoji, episodes, episodesWatched } = curr;
       const eventDate = nextWatchDate(curr);
-      const formattedTime = `<t:${Math.round((eventDate).getTime()/1000)}:t>`;
+      const formattedTime = `<t:${Math.round(eventDate.getTime()/1000)}:t>`;
       const message = episodesWatched >= episodes ? "" : `${emoji} ${name}${Number(cadence) !== 1 ? ` every ${cadence} weeks` : ""} on ${day.slice(0, 1).toUpperCase()}${day.slice(1)} at ${formattedTime}`;
       if (prev) {
         if (message) {
