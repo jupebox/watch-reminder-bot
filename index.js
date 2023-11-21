@@ -313,6 +313,7 @@ const watchShow = (specificReminder) => {
   const now = new Date();
   const todayDate = formatDate(now); // strip out time information
   const reminder = specificReminder ? specificReminder : reminders.find(reminder => formatDate(nextWatchDate(reminder)) === todayDate);
+  if (!reminder) return;
   const { episodes, episodesWatched = 0, lastWatchDate } = reminder;
   let episodeCount = 2;
   if (episodes - episodesWatched === 3) {
