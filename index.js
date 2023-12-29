@@ -724,7 +724,7 @@ client.on('messageCreate', async msg => {
         const messages = await currentChannel.awaitMessages({ filter, time: 20000, max: 1, errors: ['time'] });
         const msg = messages.first().content;
         if (msg.trim().toLowerCase() === "date") {
-          currentChannel.send(`The date ${name} was last watched is ${lastWatchDate}. The next expected watch date is ${nextWatchDate(reminder)}. Modifying the last watched date will update the next watch date according to the cadence and other reminder rules. What should the new last watched date be?`);
+          currentChannel.send(`The date ${name} was last watched is ${lastWatchDate}. The next expected watch date is ${formatDate(nextWatchDate(reminder))}. Modifying the last watched date will update the next watch date according to the cadence and other reminder rules. What should the new last watched date be?`);
           try {
             const messages = await currentChannel.awaitMessages({ filter, time: 20000, max: 1, errors: ['time'] });
             const msg = messages.first().content;
@@ -733,7 +733,7 @@ client.on('messageCreate', async msg => {
             } else {
               reminder.lastWatchDate = msg;
               fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
-              currentChannel.send(`The next expected watch date is now ${nextWatchDate(reminder)}!`);
+              currentChannel.send(`The next expected watch date is now ${formatDate(nextWatchDate(reminder))}!`);
             }
           } catch (err) {
             log(err);
@@ -767,6 +767,19 @@ client.on('messageCreate', async msg => {
             }
             fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
             currentChannel.send(`You have now watched ${reminder.episodesWatched} out of ${reminder.episodes} episodes of ${name}!`);
+          } catch (err) {
+            log(err);
+            currentChannel.send("Request timed out.");
+            return;
+          }
+        } else if (msg.trim().toLowerCase() === "emoji") {
+          currentChannel.send(`What emoji vibes best with ${name}?`);
+          try {
+            const messages = await currentChannel.awaitMessages({ filter, time: 20000, max: 1, errors: ['time'] });
+            const msg = messages.first().content;
+            reminder.emoji = msg;
+            fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
+            currentChannel.send(`${reminder.emoji} - ${name}. I like it!`);
           } catch (err) {
             log(err);
             currentChannel.send("Request timed out.");
