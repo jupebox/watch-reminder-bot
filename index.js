@@ -793,7 +793,7 @@ client.on('messageCreate', async msg => {
             return;
           }
         } else if (msg.trim().toLowerCase() === "neko") {
-          currentChannel.send(`${name} is currently ${noNeko ? "not " : ""} watched with neko commands. Flip the switch?`);
+          currentChannel.send(`${name} is currently ${noNeko ? "not " : ""}watched with neko commands. Flip the switch?`);
           try {
             const messages = await currentChannel.awaitMessages({ filter, time: 20000, max: 1, errors: ['time'] });
             const msg = messages.first().content;
@@ -801,7 +801,7 @@ client.on('messageCreate', async msg => {
               reminder.noNeko = !noNeko;
             }            
             fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
-            currentChannel.send(`Ok! ${name} will now ${noNeko ? "not " : ""} be watched with neko.`);
+            currentChannel.send(`Ok! ${name} will now ${reminder.noNeko ? "not " : ""}be watched with neko.`);
           } catch (err) {
             log(err);
             currentChannel.send("Request timed out.");
