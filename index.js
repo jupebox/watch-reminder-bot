@@ -101,6 +101,7 @@ const generateCalendarEvent = (reminder) => {
 }
 
 let reminderCount = 0; // prevent duplicate reminders from being set on the same day
+let lowKeyReminder; // 10am pacific reminder
 let earlyReminder; // 2 hour reminder
 let lateReminder; // 10 minute reminder
 let cleanupTimer; // 2 hour timer after watch time to mark the show as watched
@@ -145,6 +146,14 @@ const remindToWatch = (reminder) => {
         reminderCount++;
       }
     }, (millisecondsUntilEvent - millisecondsInTwoHours));
+    const pacific10AMTime = new Date(convertReminderTimeStampToBetterTimeStamp(todayDate, "10:00")).getTime();
+    const nowTime = now.getTime();
+    if (nowTime < pacific10AMTime) {
+      lowKeyReminder = setTimeout(() => {
+        const channel = client.channels.cache.get(channelId);
+        channel.send(`We're watching ${name} today! ${emoji}`);
+      }, (pacific10AMTime - nowTime));
+    }
   }
   let episodesToWatch = 2;
   if (episodes - episodesWatched === 3) {
@@ -590,6 +599,7 @@ client.on('messageCreate', async msg => {
         const messages = await currentChannel.awaitMessages({ filter, time: 10000, max: 1, errors: ['time'] });
         const msg = messages.first().content;
         if (msg.slice(0, 1).toLowerCase() === "y") {
+          clearTimeout(lowKeyReminder);
           clearTimeout(earlyReminder);
           clearTimeout(lateReminder);
           clearTimeout(cleanupTimer);
