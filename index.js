@@ -717,6 +717,18 @@ client.on('messageCreate', async msg => {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders = [], scheduleChannelId } = schedule;
     postSchedule(reminders, scheduleChannelId, false);
+  } else if (content === "!reminder start") {
+    const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
+    const { reminders = [] } = schedule;
+    const reminder = reminders.find(reminder => {
+      const { channelId: reminderChannelId } = reminder;
+      return (channelId === reminderChannelId);
+    });
+    if (reminder && reminder.name) {
+      remindToWatch(reminder);
+    } else {
+      currentChannel.send("No reminder found for this channel.");
+    }
   } else if (content === "!reminder edit") {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders = [] } = schedule;
