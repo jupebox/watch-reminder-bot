@@ -20,6 +20,7 @@ const {
   formatDate,
   nextWatchDate,
   todayDayIndex,
+  convertReminderTimeStampToBetterTimeStamp,
 } = require("./helpers.js");
 
 const calendarEventLines = fs.readFileSync(CALENDAR_EVENT, {encoding: "utf8"}).toString().split("\n");

@@ -70,3 +70,4 @@ exports.dayIndeces = dayIndeces;
 exports.formatDate = formatDate;
 exports.nextWatchDate = nextWatchDate;
 exports.todayDayIndex = todayDayIndex;
+exports.convertReminderTimeStampToBetterTimeStamp = convertReminderTimeStampToBetterTimeStamp;
