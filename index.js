@@ -194,7 +194,7 @@ const remindToWatch = (reminder) => {
   }, (millisecondsUntilEvent + millisecondsInTwoHours));
 }
 
-const postSchedule = (reminders, scheduleChannelId, delay = true) => {
+const postSchedule = (delay = true) => {
   const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
   const { reminders = [], scheduleChannelId, lastPostedSchedule } = schedule;
   const now = new Date();
@@ -308,15 +308,15 @@ const checkForReminders = () => {
   const nowDayIndex = todayDayIndex();
 
   if (nowDayIndex === 5 && scheduleChannelId) {
-    postSchedule(reminders, scheduleChannelId);
+    postSchedule();
   }
 
   const now = new Date();
   const todayDate = formatDate(now); // strip out time information
 
   const reminder = reminders.find(reminder => formatDate(nextWatchDate(reminder)) === todayDate);
-  const { episodesWatched = 0, episodes, name } = reminder;
   if (reminder) {
+    const { episodesWatched = 0, episodes, name } = reminder;
     if (Number(episodesWatched) !== Number(episodes)) {
       remindToWatch(reminder);
     } else {
@@ -329,7 +329,7 @@ const checkForReminders = () => {
   const hoursUntilTomorrow = 23 - now.getHours();
   setTimeout(() => {
     checkForReminders();
-  }, ((hoursUntilTomorrow * 60) + minutesUntilTheHour) * 60 * 1000);
+  }, ((hoursUntilTomorrow * 60) + minutesUntilTheHour + 1) * 60 * 1000);
 }
 
 const watchShow = (specificReminder) => {
@@ -735,9 +735,7 @@ client.on('messageCreate', async msg => {
       watchShow();
     }
   } else if (content === "!reminder schedule") {
-    const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
-    const { reminders = [], scheduleChannelId } = schedule;
-    postSchedule(reminders, scheduleChannelId, false);
+    postSchedule(false);
   } else if (content === "!reminder start") {
     const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
     const { reminders = [] } = schedule;
