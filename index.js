@@ -315,12 +315,13 @@ const checkForReminders = () => {
   const todayDate = formatDate(now); // strip out time information
 
   const reminder = reminders.find(reminder => formatDate(nextWatchDate(reminder)) === todayDate);
+  const { episodesWatched = 0, episodes, name } = reminder;
   if (reminder) {
-    if (Number(reminder.episodesWatched) !== Number(reminder.episodes)) {
+    if (Number(episodesWatched) !== Number(episodes)) {
       remindToWatch(reminder);
     } else {
       // clean up shows with no episodes left to watch
-      deleteReminder(reminder.name);
+      deleteReminder(name);
     }
   }
   // check at midnight for tomorrow's reminders
