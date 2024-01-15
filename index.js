@@ -314,15 +314,17 @@ const checkForReminders = () => {
   const now = new Date();
   const todayDate = formatDate(now); // strip out time information
 
-  const reminder = reminders.find(reminder => formatDate(nextWatchDate(reminder)) === todayDate);
-  if (reminder) {
-    const { episodesWatched = 0, episodes, name } = reminder;
-    if (Number(episodesWatched) !== Number(episodes)) {
-      remindToWatch(reminder);
-    } else {
-      // clean up shows with no episodes left to watch
-      deleteReminder(name);
-    }
+  const todayReminders = reminders.filter(reminder => formatDate(nextWatchDate(reminder)) === todayDate);
+  if (todayReminders.length > 0) {
+    todayReminders.forEach(reminder => {
+      const { episodesWatched = 0, episodes, name } = reminder;
+      if (Number(episodesWatched) !== Number(episodes)) {
+        remindToWatch(reminder);
+      } else {
+        // clean up shows with no episodes left to watch
+        deleteReminder(name);
+      }
+    });
   }
   // check at midnight for tomorrow's reminders
   const minutesUntilTheHour = 60 - now.getMinutes();
