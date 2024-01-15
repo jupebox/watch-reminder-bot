@@ -147,13 +147,13 @@ const remindToWatch = (reminder) => {
         reminderCount++;
       }
     }, (millisecondsUntilEvent - millisecondsInTwoHours));
-    const pacific10AMTime = new Date(convertReminderTimeStampToBetterTimeStamp(todayDate, "10:00")).getTime();
+    const pacific8AMTime = new Date(convertReminderTimeStampToBetterTimeStamp(todayDate, "8:00")).getTime();
     const nowTime = now.getTime();
-    if (nowTime < pacific10AMTime) {
+    if (nowTime < pacific8AMTime) {
       lowKeyReminder = setTimeout(() => {
         const channel = client.channels.cache.get(channelId);
         channel.send(`We're watching ${name} today! ${emoji}`);
-      }, (pacific10AMTime - nowTime));
+      }, (pacific8AMTime - nowTime));
     }
   }
   let episodesToWatch = 2;
@@ -195,6 +195,8 @@ const remindToWatch = (reminder) => {
 }
 
 const postSchedule = (reminders, scheduleChannelId, delay = true) => {
+  const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
+  const { reminders = [], scheduleChannelId, lastPostedSchedule } = schedule;
   const now = new Date();
   // exclude reminders for shows that aren't happening this week
   // todo: support future start dates for upcoming weekly shows
@@ -225,7 +227,7 @@ const postSchedule = (reminders, scheduleChannelId, delay = true) => {
   }
 
   // create the schedule string
-  const schedule = dayIndeces.reduce((message, day) => {
+  const scheduleString = dayIndeces.reduce((message, day) => {
     const reminder = thisWeekReminders.find(reminder => reminder.day.toLowerCase() === day) || {};
     const upperDay = `${day.slice(0, 1).toUpperCase()}${day.slice(1)}`;
     let daySchedule = `${upperDay}: no stream`;
@@ -261,16 +263,23 @@ const postSchedule = (reminders, scheduleChannelId, delay = true) => {
   // this function gets called at midnight on Saturday,
   // so this delays the schedule for 8 hours so it doesn't get posted in the middle of the night
   // technically this is going to get called at some other time in some other time zone but wow I don't care. as long as it's posted on saturday it's fine
-  if (delay) {
-    log("Posting schedule in 8 hours");
-    log(schedule);
-    setTimeout(() => {
-      const channel = client.channels.cache.get(scheduleChannelId);
-      channel.send(`Anime schedule ${weekStart} - ${weekEnd}:\n${schedule}`);
-    }, (millisecondsInOneHour * 8));
+  if (delay && scheduleString !== lastPostedSchedule) {
+    const todayDate = formatDate(now); // strip out time information
+    const pacific8AMTime = new Date(convertReminderTimeStampToBetterTimeStamp(todayDate, "8:00")).getTime();
+    const nowTime = now.getTime();
+    if (nowTime < pacific8AMTime) {
+      log("Posting schedule at 8am pacific!");
+      log(scheduleString);
+      setTimeout(() => {
+        const channel = client.channels.cache.get(scheduleChannelId);
+        channel.send(`Anime schedule ${weekStart} - ${weekEnd}:\n${scheduleString}`);
+        schedule.lastPostedSchedule = scheduleString;
+        fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
+      }, (pacific8AMTime - nowTime));
+    }
   } else {
     const channel = client.channels.cache.get(scheduleChannelId);
-    channel.send(`Anime schedule ${weekStart} - ${weekEnd}:\n${schedule}`);
+    channel.send(`Anime schedule ${weekStart} - ${weekEnd}:\n${scheduleString}`);
   }
 }
 
