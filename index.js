@@ -453,7 +453,7 @@ client.on('messageCreate', async msg => {
     currentChannel.send(`Please provide the remaining details for the ${name} reminder. Reminder parameters are: channel, role, day, time, cadence (optional), episodes (optional), emoji (optional), skip neko start (optional, y/n)`);
     try {
       const messages = await currentChannel.awaitMessages({ filter, time: 60000, max: 1, errors: ['time'] });
-      [channel, role, day, time, cadence, episodes, emoji, nekoMessage] = messages.first().content.split(" ");
+      [channel, role, day, time, cadence, episodes, emoji, nekoMessage = "n"] = messages.first().content.split(" ");
     } catch {
       currentChannel.send("Request timed out. Reminder not created.");
       return;
