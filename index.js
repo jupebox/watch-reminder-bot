@@ -188,7 +188,9 @@ const remindToWatch = (reminder) => {
   }
   // mark the show as watched
   cleanupTimer = setTimeout(() => {
+    log("Tidying up...");
     if (!watchedShow) {
+      log("Marking today's show as watched!");
         watchShow();
     }
   }, (millisecondsUntilEvent + millisecondsInTwoHours));
@@ -341,7 +343,7 @@ const watchShow = (specificReminder) => {
   const todayDate = formatDate(now); // strip out time information
   const reminder = specificReminder ? specificReminder : reminders.find(reminder => formatDate(nextWatchDate(reminder)) === todayDate);
   if (!reminder) return;
-  const { episodes, episodesWatched = 0, lastWatchDate } = reminder;
+  const { episodes, episodesWatched = 0, lastWatchDate, name } = reminder;
   let episodeCount = 2;
   if (episodes - episodesWatched === 3) {
     episodeCount = 3;
@@ -350,6 +352,7 @@ const watchShow = (specificReminder) => {
     reminder.episodesWatched = episodesWatched + episodeCount;
     reminder.lastWatchDate = specificReminder ? formatDate(nextWatchDate(reminder)) : todayDate;
     reminder.episodesWatchedLastSession = episodeCount;
+    schedule.reminders = [...reminders.filter(originalReminder => originalReminder.name !== name), reminder];
     fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
     log(`Watched ${episodeCount} episodes of ${reminder.name}!`);
   }
