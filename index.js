@@ -191,7 +191,7 @@ const remindToWatch = (reminder) => {
     log("Tidying up...");
     if (!watchedShow) {
       log("Marking today's show as watched!");
-        watchShow();
+        watchShow(reminder);
     }
   }, (millisecondsUntilEvent + millisecondsInTwoHours));
 }
@@ -760,7 +760,7 @@ client.on('messageCreate', async msg => {
       const { channelId: reminderChannelId } = reminder;
       return (channelId === reminderChannelId);
     });
-    const { episodes, episodesWatched, name, lastWatchDate, time, noNeko = false } = reminder;
+    const { cadence, episodes, episodesWatched, name, lastWatchDate, time, noNeko = false } = reminder;
     if (reminder && reminder.name) {
       currentChannel.send(`What about the ${name} reminder do you want to edit? Try "date", "time", or "episodes".`);
       try {
@@ -823,6 +823,19 @@ client.on('messageCreate', async msg => {
             reminder.emoji = msg;
             fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
             currentChannel.send(`${reminder.emoji} - ${name}. I like it!`);
+          } catch (err) {
+            log(err);
+            currentChannel.send("Request timed out.");
+            return;
+          }
+        } else if (msg.trim().toLowerCase() === "cadence") {
+          currentChannel.send(`${name} is currently watched every ${cadence === 1 ? 'week' : `${cadence} weeks`}. What should the cadence be?`);
+          try {
+            const messages = await currentChannel.awaitMessages({ filter, time: 20000, max: 1, errors: ['time'] });
+            const msg = messages.first().content;
+            reminder.cadence = msg;
+            fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
+            currentChannel.send(`Ok, ${name} will now be watched every ${reminder.cadence === 1 ? 'week' : `${reminder.cadence} weeks`}!`);
           } catch (err) {
             log(err);
             currentChannel.send("Request timed out.");
