@@ -828,14 +828,27 @@ client.on('messageCreate', async msg => {
             currentChannel.send("Request timed out.");
             return;
           }
+        } else if (msg.trim().toLowerCase() === "role") {
+          currentChannel.send(`What role do you want to ping when it's time for ${name}?`);
+          try {
+            const messages = await currentChannel.awaitMessages({ filter, time: 20000, max: 1, errors: ['time'] });
+            const msg = messages.first().content;
+            reminder.role = msg;
+            fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
+            currentChannel.send(`Ok, ${reminder.role} will now be pinged for ${name} reminders!`);
+          } catch (err) {
+            log(err);
+            currentChannel.send("Request timed out.");
+            return;
+          }
         } else if (msg.trim().toLowerCase() === "cadence") {
-          currentChannel.send(`${name} is currently watched every ${cadence === 1 ? 'week' : `${cadence} weeks`}. What should the cadence be?`);
+          currentChannel.send(`${name} is currently watched every ${Number(cadence) === 1 ? 'week' : `${cadence} weeks`}. What should the cadence be?`);
           try {
             const messages = await currentChannel.awaitMessages({ filter, time: 20000, max: 1, errors: ['time'] });
             const msg = messages.first().content;
             reminder.cadence = msg;
             fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
-            currentChannel.send(`Ok, ${name} will now be watched every ${reminder.cadence === 1 ? 'week' : `${reminder.cadence} weeks`}!`);
+            currentChannel.send(`Ok, ${name} will now be watched every ${Number(reminder.cadence) === 1 ? 'week' : `${reminder.cadence} weeks`}!`);
           } catch (err) {
             log(err);
             currentChannel.send("Request timed out.");
