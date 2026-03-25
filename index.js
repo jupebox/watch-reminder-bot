@@ -41,6 +41,7 @@ const generateCalendarEvent = (reminder) => {
     channelId,
     episodes,
     episodesWatched = 0,
+    episodesPerWeek = 2,
     name,
   } = reminder;
   const now = new Date();
@@ -52,7 +53,7 @@ const generateCalendarEvent = (reminder) => {
     return `${date.getFullYear()}${makeTwoDigits(date.getMonth() + 1)}${makeTwoDigits(date.getDate())}T${makeTwoDigits(date.getHours())}${makeTwoDigits(date.getMinutes())}${makeTwoDigits(date.getSeconds())}`;
   }
   const nowTimeStamp = makeTimestamp(now);
-  const watchesLeft = Math.floor((episodes - episodesWatched) / 2);
+  const watchesLeft = Math.floor((episodes - episodesWatched) / episodesPerWeek);
   const startTimeStamp = makeTimestamp(eventDate);
   eventDate.setTime(eventDate.getTime() + millisecondsInOneHour);
   const endTimeStamp = makeTimestamp(eventDate);
@@ -117,6 +118,7 @@ const remindToWatch = (reminder) => {
     lastWatchDate,
     episodes,
     episodesWatched = 0,
+    episodesPerWeek = 2,
     noNeko = false,
   } = reminder;
   const now = new Date();
@@ -156,12 +158,14 @@ const remindToWatch = (reminder) => {
       }, (pacific8AMTime - nowTime));
     }
   }
-  let episodesToWatch = 2;
-  if (episodes - episodesWatched === 3) {
-    episodesToWatch = 3;
-  }
-  if (episodes - episodesWatched === 1) {
-    episodesToWatch = 1;
+  let episodesToWatch = episodesPerWeek;
+  if (episodesPerWeek !== 1) {
+    if (episodes - episodesWatched === 3) {
+      episodesToWatch = 3;
+    }
+    if (episodes - episodesWatched === 1) {
+      episodesToWatch = 1;
+    }
   }
   const episodeText = episodesToWatch === 1 ? episodesWatched + 1 : `${episodesWatched + 1}-${episodesWatched + episodesToWatch}`;
   if ((millisecondsUntilEvent - millisecondsInTenMinutes) < 0) {
@@ -234,14 +238,16 @@ const postSchedule = (delay = true) => {
     const upperDay = `${day.slice(0, 1).toUpperCase()}${day.slice(1)}`;
     let daySchedule = `${upperDay}: no stream`;
     if (reminder && reminder.name) {
-      const { name, episodes, episodesWatched = 0, nextWatchDate } = reminder;
+      const { name, episodes, episodesWatched = 0, episodesPerWeek = 2, nextWatchDate } = reminder;
       let isFinale = false;
-      let episodeCount = 2;
-      if (episodes - episodesWatched === 3) {
-        episodeCount = 3;
-      }
-      if (episodes - episodesWatched === 1) {
-        episodeCount = 1;
+      let episodeCount = episodesPerWeek;
+      if (episodesPerWeek !== 1) {
+        if (episodes - episodesWatched === 3) {
+          episodeCount = 3;
+        }
+        if (episodes - episodesWatched === 1) {
+          episodeCount = 1;
+        }
       }
       const episodeText = episodeCount === 1 ? episodesWatched + 1 : `${episodesWatched + 1}-${episodesWatched + episodeCount}`;
       if ((episodesWatched + episodeCount) === episodes) {
@@ -343,9 +349,9 @@ const watchShow = (specificReminder) => {
   const todayDate = formatDate(now); // strip out time information
   const reminder = specificReminder ? specificReminder : reminders.find(reminder => formatDate(nextWatchDate(reminder)) === todayDate);
   if (!reminder) return;
-  const { episodes, episodesWatched = 0, lastWatchDate, name } = reminder;
-  let episodeCount = 2;
-  if (episodes - episodesWatched === 3) {
+  const { episodes, episodesWatched = 0, episodesPerWeek = 2, lastWatchDate, name } = reminder;
+  let episodeCount = episodesPerWeek;
+  if (episodesPerWeek !== 1 && (episodes - episodesWatched === 3)) {
     episodeCount = 3;
   }
   if (lastWatchDate !== todayDate) {
@@ -365,14 +371,15 @@ client.on('ready', () => {
 });
 
 // probably should put these parameters into an object. there's a lot of them.
-const createReminder = (name, channel, role, day, time, cadence = 1, episodes = 12, emoji = ":eyes:", startWeek = 0, noNeko = false) => {
+const createReminder = (name, channel, role, day, time, cadence = 1, episodes = 12, emoji = ":eyes:", startWeek = 0, episodesPerWeek = 2, noNeko = false) => {
   const schedule = JSON.parse(fs.readFileSync(FILE_PATH, {encoding: "utf8"}));
   const { reminders = [] } = schedule;
   // only one reminder per role allowed at a time for now
   // todo: allow the same show to be watched multiple times per week by using a combination of role and day to overwrite existing reminders
   const filteredReminders = reminders.filter((reminder) => reminder.role !== role);
 
-  const dayIndex = dayIndeces.indexOf(day.toLowerCase());
+  const lowerDay = day.toLowerCase();
+  const dayIndex = dayIndeces.indexOf(lowerDay);
   const dayDateIndex = dayIndex === 6 ? 0 : dayIndex + 1;
   const showDate = new Date();
   const currentDayIndex = showDate.getDay();
@@ -396,11 +403,12 @@ const createReminder = (name, channel, role, day, time, cadence = 1, episodes = 
     cadence,
     channel,
     channelId: channel.slice(2, -1),
-    day,
+    day: lowerDay,
     dayIndex,
     emoji,
     episodes: Number(episodes),
     episodesWatched: 0,
+    episodesPerWeek,
     lastWatchDate: formatDate(new Date(lastWatchDate)),
     name,
     role,
@@ -444,7 +452,7 @@ client.on('messageCreate', async msg => {
   const filter = m => author.id === m.author.id;
   const currentChannel = client.channels.cache.get(channelId);
   if (content === "!reminder set") {
-    let name, channel, role, day, time, cadence, episodes, emoji, startWeek = 0, nekoMessage;
+    let name, channel, role, day, time, cadence, episodes, emoji, startWeek = 0, episodesPerWeek, nekoMessage;
     currentChannel.send("What's the name of the show?");
     try {
       const messages = await currentChannel.awaitMessages({ filter, time: 20000, max: 1, errors: ['time'] });
@@ -453,10 +461,10 @@ client.on('messageCreate', async msg => {
       currentChannel.send("Request timed out. Reminder not created.");
       return;
     }
-    currentChannel.send(`Please provide the remaining details for the ${name} reminder. Reminder parameters are: channel, role, day, time, cadence (optional), episodes (optional), emoji (optional), skip neko start (optional, y/n)`);
+    currentChannel.send(`Please provide the remaining details for the ${name} reminder. Reminder parameters are: channel, role, day, time, cadence (optional), episodes (optional), emoji (optional), start week (optional), episodes per session (optional), skip neko start (optional, y/n)`);
     try {
       const messages = await currentChannel.awaitMessages({ filter, time: 60000, max: 1, errors: ['time'] });
-      [channel, role, day, time, cadence, episodes, emoji, nekoMessage = "n"] = messages.first().content.split(" ");
+      [channel, role, day, time, cadence, episodes, emoji, startWeek = 0, episodesPerWeek = 2, nekoMessage = "n"] = messages.first().content.split(" ");
     } catch {
       currentChannel.send("Request timed out. Reminder not created.");
       return;
@@ -493,7 +501,7 @@ client.on('messageCreate', async msg => {
         const messages = await currentChannel.awaitMessages({ filter, time: 20000, max: 1, errors: ['time'] });
         const msg = messages.first().content;
         if (msg.slice(0, 1).toLowerCase() === "y") {
-          createReminder(name, channel, role, day, time, cadence, episodes, emoji, startWeek, noNeko);
+          createReminder(name, channel, role, day, time, cadence, episodes, emoji, startWeek, episodesPerWeek, noNeko);
           currentChannel.send("Ok, I'll replace it!");
         } else {
           currentChannel.send("Existing reminder not replaced.");
@@ -505,7 +513,7 @@ client.on('messageCreate', async msg => {
         return;
       }
     }
-    createReminder(name, channel, role, day, time, cadence, episodes, emoji, startWeek, noNeko);
+    createReminder(name, channel, role, day, time, cadence, episodes, emoji, startWeek, episodesPerWeek, noNeko);
     currentChannel.send("Reminder created!");
   } else if (content.indexOf("!reminder delete") === 0) {
     let reminderKey = content.slice("!reminder delete".length + 1);
@@ -762,7 +770,7 @@ client.on('messageCreate', async msg => {
     });
     const { cadence, episodes, episodesWatched, name, lastWatchDate, time, noNeko = false } = reminder;
     if (reminder && reminder.name) {
-      currentChannel.send(`What about the ${name} reminder do you want to edit? Try "date", "time", or "episodes".`);
+      currentChannel.send(`What about the ${name} reminder do you want to edit? Try "date", "time", "episodes", or "dosage".`);
       try {
         const messages = await currentChannel.awaitMessages({ filter, time: 20000, max: 1, errors: ['time'] });
         const msg = messages.first().content;
@@ -864,6 +872,22 @@ client.on('messageCreate', async msg => {
             }            
             fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
             currentChannel.send(`Ok! ${name} will now ${reminder.noNeko ? "not " : ""}be watched with neko.`);
+          } catch (err) {
+            log(err);
+            currentChannel.send("Request timed out.");
+            return;
+          }
+        } else if (msg.trim().toLowerCase() === "dosage") {
+          currentChannel.send(`We currently watch ${episodesPerWeek} episode${episodesPerWeek === 1 ? "" : "s"} of ${name} per session. What should it be instead?`);
+          try {
+            const messages = await currentChannel.awaitMessages({ filter, time: 20000, max: 1, errors: ['time'] });
+            const msg = messages.first().content;
+            const perWeek = msg;
+            if (perWeek && Number(perWeek)) {
+              reminder.episodesPerWeek = Number(perWeek);
+            }          
+            fs.writeFileSync(FILE_PATH, JSON.stringify(schedule));
+            currentChannel.send(`Ok! We'll watch ${perWeek} episode${Number(perWeek) === 1 ? "" : "s"} of ${name} next time.`);
           } catch (err) {
             log(err);
             currentChannel.send("Request timed out.");
