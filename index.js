@@ -408,7 +408,7 @@ const createReminder = (name, channel, role, day, time, cadence = 1, episodes = 
     emoji,
     episodes: Number(episodes),
     episodesWatched: 0,
-    episodesPerWeek,
+    episodesPerWeek: Number(episodesPerWeek),
     lastWatchDate: formatDate(new Date(lastWatchDate)),
     name,
     role,
